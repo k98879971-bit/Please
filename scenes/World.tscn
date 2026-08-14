@@ -10,9 +10,7 @@ script = ExtResource("1_root")
 [node name="Terrain" type="TileMapLayer" parent="."]
 script = ExtResource("2_world")
 
-[node name="Player" parent="." instance=ExtResource("3_player")]
+[node name="Entities" type="Node2D" parent="."]
+y_sort_enabled = true
 
-[node name="Camera2D" type="Camera2D" parent="Player"]
-zoom = Vector2(2.2, 2.2)
-position_smoothing_enabled = true
-position_smoothing_speed = 8.0
+[node name="Player" parent="Entities" instance=ExtResource("3_player")]

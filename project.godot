@@ -1,16 +1,19 @@
 ;
 ; Pixel Survival — Godot 4 project
-; 2D pixel-art open-world survival (early skeleton).
 ;
 config_version=5
 
 [application]
 
 config/name="Pixel Survival"
-config/description="2D pixel-art open-world survival. Early skeleton."
+config/description="2D pixel-art open-world survival."
 run/main_scene="res://scenes/World.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+Controls="*res://scripts/controls.gd"
 
 [display]
 
