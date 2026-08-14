@@ -1,0 +1,24 @@
+# --- Godot 4 ---
+# ВАЖНО: файлы *.import в Godot НАДО коммитить (это метаданные импорта ассетов).
+# Игнорим только локальный кэш импорта и сборочные папки.
+.godot/
+/android/build/
+
+# --- Сборочные артефакты ---
+/build/
+/dist/
+/out/
+*.apk
+*.aab
+*.pck
+
+# --- Учётки/секреты ---
+export_credentials.cfg
+*.keystore
+*.jks
+
+# --- OS / редакторы ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
