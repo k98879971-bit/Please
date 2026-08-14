@@ -1,0 +1,73 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.1"
+  APK_NAME: "PixelSurvival-debug.apk"
+
+jobs:
+  build:
+    name: Export debug APK (Godot ${{ env.GODOT_VERSION }})
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot export templates
+        run: |
+          mkdir -v -p ~/.local/share/godot/export_templates
+          mkdir -v -p ~/.config/
+          mv /root/.config/godot ~/.config/godot
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+
+      - name: Import project assets (headless)
+        run: godot --headless --import || true
+
+      - name: Export Android debug APK
+        run: |
+          mkdir -v -p build
+          godot --headless --verbose --export-debug "Android Debug" "build/${APK_NAME}"
+          echo "=== build dir ==="
+          ls -lh build
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel-survival-debug-apk
+          path: build/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pixel-survival-debug-apk
+          path: build
+
+      - name: Create release with APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="v0.1.0-build${{ github.run_number }}"
+          echo "Creating release $TAG"
+          gh release create "$TAG" build/*.apk \
+            --title "$TAG" \
+            --notes "Автоматическая сборка debug-APK (push в main). Godot ${GODOT_VERSION}. Для установки на телефон включите «установка из неизвестных источников»." \
+            --prerelease
