@@ -1,5 +1,5 @@
 extends Node2D
-## Животное: блуждает по суше, отскакивает от воды. Визуал строится по типу.
+## Животное: блуждает по суше, отскакивает от воды. Имеет HP, получает урон от удара игрока.
 
 enum Kind { CHICKEN, SHEEP, COW }
 
@@ -9,8 +9,15 @@ const SPEEDS := {
 	Kind.COW: 24.0,
 }
 
+const HP := {
+	Kind.CHICKEN: 1,
+	Kind.SHEEP: 2,
+	Kind.COW: 3,
+}
+
 @export var kind: int = Kind.SHEEP
 
+var hp := 1
 var _dir := Vector2.ZERO
 var _timer := 0.0
 var _world: TileMapLayer
@@ -18,6 +25,7 @@ var _world: TileMapLayer
 
 func _ready() -> void:
 	add_to_group("animals")
+	hp = HP[kind]
 	_world = get_tree().get_first_node_in_group("world")
 	_build_visual()
 	_pick_wander()
@@ -42,6 +50,19 @@ func _pick_wander() -> void:
 		var a := randf() * TAU
 		_dir = Vector2(cos(a), sin(a))
 	_timer = randf_range(1.2, 3.5)
+
+
+func take_hit(from_pos: Vector2) -> void:
+	hp -= 1
+	if hp <= 0:
+		queue_free()
+		return
+	# отбрасывание от игрока
+	var push := global_position - from_pos
+	if push.length() > 0.1:
+		global_position += push.normalized() * 14.0
+		_dir = push.normalized()
+	_timer = 0.4
 
 
 func _build_visual() -> void:

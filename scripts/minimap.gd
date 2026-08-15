@@ -10,6 +10,11 @@ var _world_size := Vector2.ZERO
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# верхний левый угол
+	offset_left = 12.0
+	offset_top = 12.0
+	offset_right = 12.0 + SIZE
+	offset_bottom = 12.0 + SIZE
 	var world = get_tree().get_first_node_in_group("world")
 	if world:
 		_tex = world.make_minimap_texture()

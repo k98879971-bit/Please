@@ -7,6 +7,7 @@ const TREE_GRASS_CHANCE := 0.025
 const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
 const MinimapScn := preload("res://scripts/minimap.gd")
+const HPBarScn := preload("res://scripts/hpbar.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
 
 @onready var _terrain = $Terrain
@@ -60,36 +61,38 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
 
-	# Миникарта — верхний левый угол
-	var mm = MinimapScn.new()
-	mm.offset_left = 12
-	mm.offset_top = 12
-	mm.offset_right = 12 + 170
-	mm.offset_bottom = 12 + 170
-	root.add_child(mm)
+	# Миникарта и полоса HP (сами позиционируются в верхнем левом углу)
+	root.add_child(MinimapScn.new())
+	root.add_child(HPBarScn.new())
 
-	# Джойстик — нижний левый угол
-	var joy = JoystickScn.new()
-	joy.anchor_top = 1.0
-	joy.anchor_bottom = 1.0
-	joy.offset_left = 16
-	joy.offset_right = 16 + 128
-	joy.offset_top = -16 - 128
-	joy.offset_bottom = -16
-	root.add_child(joy)
+	# Крупный джойстик (сам позиционируется в нижнем левом углу)
+	root.add_child(JoystickScn.new())
 
-	# Кнопка БЕГ — нижний правый угол
-	var btn := Button.new()
-	btn.text = "БЕГ"
+	# Кнопка БЕГ — правый нижний угол
+	var sprint := Button.new()
+	sprint.text = "БЕГ"
+	_anchor_bottom_right(sprint, 130, 90, 0)
+	sprint.add_theme_font_size_override("font_size", 30)
+	sprint.button_down.connect(func() -> void: Controls.sprint = true)
+	sprint.button_up.connect(func() -> void: Controls.sprint = false)
+	root.add_child(sprint)
+
+	# Кнопка УДАР — левее кнопки БЕГ
+	var atk := Button.new()
+	atk.text = "УДАР"
+	_anchor_bottom_right(atk, 130, 90, 130 + 16)
+	atk.add_theme_font_size_override("font_size", 30)
+	atk.button_down.connect(func() -> void: Controls.attack_queued = true)
+	root.add_child(atk)
+
+
+func _anchor_bottom_right(btn: Button, bw: int, bh: int, gap_left: int) -> void:
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
 	btn.anchor_bottom = 1.0
-	btn.offset_left = -16 - 120
-	btn.offset_right = -16
-	btn.offset_top = -16 - 80
+	var right := -16 - gap_left
+	btn.offset_right = right
+	btn.offset_left = right - bw
 	btn.offset_bottom = -16
-	btn.add_theme_font_size_override("font_size", 26)
-	btn.button_down.connect(func() -> void: Controls.sprint = true)
-	btn.button_up.connect(func() -> void: Controls.sprint = false)
-	root.add_child(btn)
+	btn.offset_top = -16 - bh
