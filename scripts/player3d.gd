@@ -1,9 +1,14 @@
 extends CharacterBody3D
-## Игрок от первого лица: ходьба, прыжок, обзор (тач справа), добыча лучом.
+## Игрок от первого лица: ходьба, прыжок, обзор, добыча/охота. HP, респавн при смерти.
 
 const GRAV := 22.0
 const SPEED := 6.0
 const JUMP := 7.5
+const MAX_HP := 100
+
+var hp := MAX_HP
+var hp_max := MAX_HP
+var spawn_pos := Vector3.ZERO
 
 var _yaw := 0.0
 var _pitch := 0.0
@@ -27,6 +32,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if hp <= 0:
+		_respawn()
+		return
 	_cam.rotation = Vector3(_pitch, _yaw, 0)
 	velocity.y -= GRAV * delta
 
@@ -63,12 +71,24 @@ func _physics_process(delta: float) -> void:
 
 	if Controls.attack_queued:
 		Controls.attack_queued = false
-		_gather()
+		_use()
 
 
-func _gather() -> void:
+func take_damage(amount: int) -> void:
+	hp = clampi(hp - amount, 0, hp_max)
+
+
+func _respawn() -> void:
+	hp = MAX_HP
+	global_position = spawn_pos
+	velocity = Vector3.ZERO
+
+
+func _use() -> void:
 	_ray.force_raycast_update()
 	if _ray.is_colliding():
 		var col = _ray.get_collider()
 		if col and col.has_method("gather"):
 			col.gather()
+		elif col and col.has_method("hit"):
+			col.hit(1)

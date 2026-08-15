@@ -1,12 +1,15 @@
 extends Node3D
-## 3D-сцена: земля, небо, ресурсы (дерево/камень/сера) с процедурными текстурами, игрок-FPS, HUD.
+## 3D-сцена: земля/небо, ресурсы с текстурами, животные, игрок-FPS, HUD.
 
 const Player3DScn := preload("res://scenes/Player3D.tscn")
 const ResNode := preload("res://scripts/resource_node.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
+const AnimalScn := preload("res://scripts/animal3d.gd")
 
 var _rng := RandomNumberGenerator.new()
 var _labels := {}
+var _hp_label: Label
+var _player
 
 var _mat_ground: StandardMaterial3D
 var _mat_wood: StandardMaterial3D
@@ -21,6 +24,7 @@ func _ready() -> void:
 	_build_env()
 	_build_ground()
 	_build_resources()
+	_spawn_animals()
 	_build_player()
 	_build_hud()
 
@@ -28,9 +32,11 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	for r in _labels:
 		_labels[r].text = "%s: %d" % [_rname(r), Inv.count(r)]
+	if _hp_label and _player:
+		_hp_label.text = "HP: %d/%d" % [_player.hp, _player.hp_max]
 
 
-# --- Материалы с процедурными текстурами ---
+# --- Материалы ---
 
 func _build_materials() -> void:
 	_mat_ground = _mat(_noise_tex(Color(0.27, 0.48, 0.24), 0.14, 1), Vector3(40, 40, 40))
@@ -112,6 +118,16 @@ func _build_resources() -> void:
 		_spawn_rock(_rand_pos(), "sulfur")
 
 
+func _spawn_animals() -> void:
+	var counts := {AnimalScn.Kind.CHICKEN: 6, AnimalScn.Kind.DEER: 5, AnimalScn.Kind.BOAR: 4, AnimalScn.Kind.BEAR: 2}
+	for k in counts:
+		for _i in range(counts[k]):
+			var a = AnimalScn.new()
+			a.kind = k
+			a.position = Vector3(_rng.randf_range(-85, 85), 1.5, _rng.randf_range(-85, 85))
+			add_child(a)
+
+
 func _rand_pos() -> Vector3:
 	return Vector3(_rng.randf_range(-90, 90), 0, _rng.randf_range(-90, 90))
 
@@ -179,7 +195,9 @@ func _spawn_rock(pos: Vector3, rtype: String) -> void:
 func _build_player() -> void:
 	var p := Player3DScn.instantiate()
 	p.position = Vector3(0, 2, 0)
+	p.spawn_pos = Vector3(0, 2, 0)
 	add_child(p)
+	_player = p
 
 
 func _build_hud() -> void:
@@ -195,17 +213,20 @@ func _build_hud() -> void:
 	vbox.offset_top = 16
 	vbox.add_theme_constant_override("separation", 4)
 	root.add_child(vbox)
-	for r in ["wood", "stone", "sulfur"]:
+	_hp_label = Label.new()
+	_hp_label.add_theme_font_size_override("font_size", 26)
+	vbox.add_child(_hp_label)
+	for r in ["wood", "stone", "sulfur", "meat"]:
 		var l := Label.new()
 		l.text = _rname(r) + ": 0"
-		l.add_theme_font_size_override("font_size", 24)
+		l.add_theme_font_size_override("font_size", 22)
 		vbox.add_child(l)
 		_labels[r] = l
 
 	root.add_child(JoystickScn.new())
 
 	var g_btn := Button.new()
-	g_btn.text = "ДОБЫТЬ"
+	g_btn.text = "ДОБЫТЬ/УДАР"
 	_stack(g_btn, 0)
 	g_btn.button_down.connect(func() -> void: Controls.attack_queued = true)
 	root.add_child(g_btn)
@@ -218,7 +239,7 @@ func _build_hud() -> void:
 
 
 func _stack(btn: Button, idx: int) -> void:
-	var bw := 150
+	var bw := 170
 	var bh := 80
 	var gap := 12
 	btn.anchor_left = 1.0
@@ -230,7 +251,7 @@ func _stack(btn: Button, idx: int) -> void:
 	var bottom := -16 - idx * (bh + gap)
 	btn.offset_bottom = bottom
 	btn.offset_top = bottom - bh
-	btn.add_theme_font_size_override("font_size", 24)
+	btn.add_theme_font_size_override("font_size", 22)
 
 
 func _rname(r: String) -> String:
@@ -241,5 +262,7 @@ func _rname(r: String) -> String:
 			return "Камень"
 		"sulfur":
 			return "Сера"
+		"meat":
+			return "Мясо"
 		_:
 			return r
