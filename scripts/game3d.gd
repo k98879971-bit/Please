@@ -1,6 +1,5 @@
 extends Node3D
-## 3D-сцена с биомами: земля-текстура биомов (лес/равнина/пустыня/снег/скалы/вода),
-## ресурсы и животные спавнятся по подходящим биомам.
+## 3D-сцена с биомами: земля-текстура биомов, ресурсы, животные (с текстурами), игрок-FPS, HUD.
 
 const Player3DScn := preload("res://scenes/Player3D.tscn")
 const ResNode := preload("res://scripts/resource_node.gd")
@@ -31,6 +30,10 @@ var _mat_wood: StandardMaterial3D
 var _mat_foliage: StandardMaterial3D
 var _mat_stone: StandardMaterial3D
 var _mat_sulfur: StandardMaterial3D
+var _mat_chicken: StandardMaterial3D
+var _mat_deer: StandardMaterial3D
+var _mat_boar: StandardMaterial3D
+var _mat_bear: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -112,6 +115,10 @@ func _build_materials() -> void:
 	_mat_foliage = _mat(_noise_tex(Color(0.18, 0.46, 0.18), 0.10, 3), Vector3(2, 2, 2))
 	_mat_stone = _mat(_noise_tex(Color(0.50, 0.50, 0.52), 0.13, 4), Vector3(1, 1, 1))
 	_mat_sulfur = _mat(_noise_tex(Color(0.86, 0.80, 0.26), 0.10, 5), Vector3(1.5, 1.5, 1.5))
+	_mat_chicken = _mat(_noise_tex(Color(0.96, 0.96, 0.92), 0.05, 11, 64), Vector3(1, 1, 1))
+	_mat_deer = _mat(_noise_tex(Color(0.55, 0.40, 0.27), 0.08, 12, 64), Vector3(1, 1, 1))
+	_mat_boar = _mat(_noise_tex(Color(0.32, 0.26, 0.21), 0.07, 13, 64), Vector3(1, 1, 1))
+	_mat_bear = _mat(_noise_tex(Color(0.30, 0.22, 0.16), 0.07, 14, 64), Vector3(1, 1, 1))
 
 
 func _noise_tex(base: Color, amp: float, seed: int, size := 128) -> ImageTexture:
@@ -203,10 +210,12 @@ func _build_resources() -> void:
 
 func _spawn_animals() -> void:
 	var counts := {AnimalScn.Kind.CHICKEN: 7, AnimalScn.Kind.DEER: 5, AnimalScn.Kind.BOAR: 4, AnimalScn.Kind.BEAR: 2}
+	var mats := {AnimalScn.Kind.CHICKEN: _mat_chicken, AnimalScn.Kind.DEER: _mat_deer, AnimalScn.Kind.BOAR: _mat_boar, AnimalScn.Kind.BEAR: _mat_bear}
 	for k in counts:
 		for _i in range(counts[k]):
 			var a = AnimalScn.new()
 			a.kind = k
+			a.body_mat = mats[k]
 			var p := _pos_in_biomes([Biome.PLAINS, Biome.FOREST])
 			a.position = Vector3(p.x, 1.5, p.z)
 			add_child(a)

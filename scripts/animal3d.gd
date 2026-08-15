@@ -1,18 +1,19 @@
 extends CharacterBody3D
-## Животное в 3D. Бродит; мирные (курица/олень) убегают, хищники (кабан/медведь) нападают.
+## Животное в 3D. Уникальные узнаваемые модели по типу + текстура. Бродят; мирные убегают, хищники нападают.
 
 const GRAV := 22.0
 
 enum Kind { CHICKEN, DEER, BOAR, BEAR }
 
 const STATS := {
-	Kind.CHICKEN: {"hp": 2, "speed": 3.0, "aggr": false, "dmg": 0, "meat": 1, "size": 0.4, "color": Color(0.95, 0.95, 0.90)},
-	Kind.DEER: {"hp": 3, "speed": 5.0, "aggr": false, "dmg": 0, "meat": 2, "size": 1.1, "color": Color(0.60, 0.45, 0.30)},
-	Kind.BOAR: {"hp": 4, "speed": 4.0, "aggr": true, "dmg": 8, "meat": 2, "size": 0.8, "color": Color(0.30, 0.25, 0.20)},
-	Kind.BEAR: {"hp": 7, "speed": 4.5, "aggr": true, "dmg": 14, "meat": 3, "size": 1.3, "color": Color(0.25, 0.20, 0.18)},
+	Kind.CHICKEN: {"hp": 2, "speed": 3.0, "aggr": false, "dmg": 0, "meat": 1, "size": 0.4},
+	Kind.DEER: {"hp": 3, "speed": 5.0, "aggr": false, "dmg": 0, "meat": 2, "size": 1.1},
+	Kind.BOAR: {"hp": 4, "speed": 4.0, "aggr": true, "dmg": 8, "meat": 2, "size": 0.8},
+	Kind.BEAR: {"hp": 7, "speed": 4.5, "aggr": true, "dmg": 14, "meat": 3, "size": 1.3},
 }
 
 @export var kind: int = Kind.CHICKEN
+var body_mat: Material
 
 var hp := 2
 var _dir := Vector3.ZERO
@@ -83,27 +84,102 @@ func hit(damage: int) -> void:
 		_dir = _dir.normalized()
 
 
+# --- Модели ---
+
 func _build(s: Dictionary) -> void:
 	var sz: float = float(s["size"])
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = s["color"]
-	var body := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(sz * 1.4, sz, sz * 0.8)
-	bm.material = mat
-	body.mesh = bm
-	body.position = Vector3(0, sz * 0.5, 0)
-	add_child(body)
-	var head := MeshInstance3D.new()
-	var hm := BoxMesh.new()
-	hm.size = Vector3(sz * 0.5, sz * 0.5, sz * 0.5)
-	hm.material = mat
-	head.mesh = hm
-	head.position = Vector3(0, sz * 0.85, sz * 0.7)
-	add_child(head)
-	var c := CollisionShape3D.new()
+	match kind:
+		Kind.CHICKEN:
+			_build_chicken(sz)
+		Kind.DEER:
+			_build_deer(sz)
+		Kind.BOAR:
+			_build_boar(sz)
+		Kind.BEAR:
+			_build_bear(sz)
+	var col := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
-	bs.size = Vector3(sz * 1.4, sz, sz * 1.5)
-	c.shape = bs
-	c.position = Vector3(0, sz * 0.5, 0)
-	add_child(c)
+	bs.size = Vector3(sz * 1.4, sz * 1.7, sz * 1.9)
+	col.shape = bs
+	col.position = Vector3(0, sz * 0.85, 0)
+	add_child(col)
+
+
+func _build_chicken(sz: float) -> void:
+	var yellow := _flat(Color(1.0, 0.8, 0.2))
+	var red := _flat(Color(0.9, 0.2, 0.2))
+	var lh := sz * 0.45
+	_box(Vector3(sz * 1.1, sz * 0.9, sz * 1.3), body_mat, Vector3(0, lh + sz * 0.45, 0))
+	_box(Vector3(sz * 0.45, sz * 0.45, sz * 0.45), body_mat, Vector3(0, lh + sz * 1.0, sz * 0.45))
+	_box(Vector3(sz * 0.16, sz * 0.22, sz * 0.3), red, Vector3(0, lh + sz * 1.28, sz * 0.42))
+	_box(Vector3(sz * 0.12, sz * 0.1, sz * 0.25), yellow, Vector3(0, lh + sz * 0.95, sz * 0.72))
+	_cyl(sz * 0.05, lh, yellow, Vector3(-sz * 0.2, lh * 0.5, -sz * 0.2))
+	_cyl(sz * 0.05, lh, yellow, Vector3(sz * 0.2, lh * 0.5, -sz * 0.2))
+
+
+func _build_deer(sz: float) -> void:
+	var tan := _flat(Color(0.72, 0.56, 0.36))
+	var lh := sz * 0.85
+	_box(Vector3(sz * 0.7, sz * 0.7, sz * 1.5), body_mat, Vector3(0, lh + sz * 0.35, 0))
+	_legs(body_mat, sz * 0.25, sz * 0.55, lh, sz * 0.09)
+	_box(Vector3(sz * 0.4, sz * 0.4, sz * 0.5), body_mat, Vector3(0, lh + sz * 0.75, sz * 0.85))
+	_cyl(sz * 0.04, sz * 0.4, tan, Vector3(-sz * 0.15, lh + sz * 1.1, sz * 0.8))
+	_cyl(sz * 0.04, sz * 0.4, tan, Vector3(sz * 0.15, lh + sz * 1.1, sz * 0.8))
+	_box(Vector3(sz * 0.15, sz * 0.22, sz * 0.15), tan, Vector3(0, lh + sz * 0.5, -sz * 0.8))
+
+
+func _build_boar(sz: float) -> void:
+	var pink := _flat(Color(0.5, 0.35, 0.3))
+	var ivory := _flat(Color(0.92, 0.9, 0.85))
+	var lh := sz * 0.45
+	_box(Vector3(sz * 1.0, sz * 0.75, sz * 1.6), body_mat, Vector3(0, lh + sz * 0.4, 0))
+	_legs(body_mat, sz * 0.35, sz * 0.6, lh, sz * 0.1)
+	_box(Vector3(sz * 0.45, sz * 0.45, sz * 0.6), body_mat, Vector3(0, lh + sz * 0.7, sz * 0.8))
+	_box(Vector3(sz * 0.26, sz * 0.2, sz * 0.26), pink, Vector3(0, lh + sz * 0.6, sz * 1.12))
+	_cyl(sz * 0.03, sz * 0.18, ivory, Vector3(-sz * 0.12, lh + sz * 0.55, sz * 1.02))
+	_cyl(sz * 0.03, sz * 0.18, ivory, Vector3(sz * 0.12, lh + sz * 0.55, sz * 1.02))
+
+
+func _build_bear(sz: float) -> void:
+	var dark := _flat(Color(0.16, 0.11, 0.08))
+	var lh := sz * 0.55
+	_box(Vector3(sz * 0.95, sz * 0.9, sz * 1.45), body_mat, Vector3(0, lh + sz * 0.45, 0))
+	_legs(body_mat, sz * 0.32, sz * 0.55, lh, sz * 0.13)
+	_box(Vector3(sz * 0.5, sz * 0.5, sz * 0.5), body_mat, Vector3(0, lh + sz * 0.85, sz * 0.75))
+	_box(Vector3(sz * 0.18, sz * 0.18, sz * 0.1), dark, Vector3(-sz * 0.2, lh + sz * 1.18, sz * 0.7))
+	_box(Vector3(sz * 0.18, sz * 0.18, sz * 0.1), dark, Vector3(sz * 0.2, lh + sz * 1.18, sz * 0.7))
+	_box(Vector3(sz * 0.26, sz * 0.2, sz * 0.22), dark, Vector3(0, lh + sz * 0.78, sz * 1.05))
+
+
+func _legs(mat: Material, hw: float, hl: float, h: float, r: float) -> void:
+	for sx in [-1.0, 1.0]:
+		for sl in [-1.0, 1.0]:
+			_cyl(r, h, mat, Vector3(sx * hw, h * 0.5, sl * hl))
+
+
+func _box(s: Vector3, mat: Material, pos: Vector3) -> void:
+	var m := MeshInstance3D.new()
+	var b := BoxMesh.new()
+	b.size = s
+	b.material = mat
+	m.mesh = b
+	m.position = pos
+	add_child(m)
+
+
+func _cyl(r: float, h: float, mat: Material, pos: Vector3) -> void:
+	var m := MeshInstance3D.new()
+	var c := CylinderMesh.new()
+	c.top_radius = r
+	c.bottom_radius = r
+	c.height = h
+	c.material = mat
+	m.mesh = c
+	m.position = pos
+	add_child(m)
+
+
+func _flat(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	return m
