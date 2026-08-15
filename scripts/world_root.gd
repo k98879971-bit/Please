@@ -8,13 +8,25 @@ const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
 const MinimapScn := preload("res://scripts/minimap.gd")
 const HPBarScn := preload("res://scripts/hpbar.gd")
+const StaminaBarScn := preload("res://scripts/staminabar.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
+const MenuPanelScn := preload("res://scripts/menupanel.gd")
+
+const WNAMES := {
+	"fist": "Кулаки",
+	"axe": "Топор",
+	"sword": "Меч",
+	"bow": "Лук",
+	"crossbow": "Арбалет",
+}
 
 @onready var _terrain = $Terrain
 @onready var _entities: Node2D = $Entities
 @onready var _player: CharacterBody2D = $Entities/Player
 
 var _rng := RandomNumberGenerator.new()
+var _menu_panel
+var _equip_label: Label
 
 
 func _ready() -> void:
@@ -23,6 +35,11 @@ func _ready() -> void:
 	_spawn_trees()
 	_spawn_animals()
 	_build_ui()
+
+
+func _process(_delta: float) -> void:
+	if _player and _equip_label:
+		_equip_label.text = "Оружие: " + WNAMES.get(_player.equipped, _player.equipped)
 
 
 func _spawn_trees() -> void:
@@ -61,14 +78,20 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
 
-	# Миникарта и полоса HP (сами позиционируются в верхнем левом углу)
 	root.add_child(MinimapScn.new())
 	root.add_child(HPBarScn.new())
-
-	# Крупный джойстик (сам позиционируется в нижнем левом углу)
+	root.add_child(StaminaBarScn.new())
 	root.add_child(JoystickScn.new())
 
-	# Кнопка БЕГ — правый нижний угол
+	# Подпись текущего оружия (под полосами)
+	_equip_label = Label.new()
+	_equip_label.offset_left = 12.0
+	_equip_label.offset_top = 250.0
+	_equip_label.offset_right = 12.0 + 170.0
+	_equip_label.offset_bottom = 274.0
+	root.add_child(_equip_label)
+
+	# Кнопки БЕГ и УДАР (нижний правый угол)
 	var sprint := Button.new()
 	sprint.text = "БЕГ"
 	_anchor_bottom_right(sprint, 130, 90, 0)
@@ -77,13 +100,32 @@ func _build_ui() -> void:
 	sprint.button_up.connect(func() -> void: Controls.sprint = false)
 	root.add_child(sprint)
 
-	# Кнопка УДАР — левее кнопки БЕГ
 	var atk := Button.new()
 	atk.text = "УДАР"
 	_anchor_bottom_right(atk, 130, 90, 130 + 16)
 	atk.add_theme_font_size_override("font_size", 30)
 	atk.button_down.connect(func() -> void: Controls.attack_queued = true)
 	root.add_child(atk)
+
+	# Меню (инвентарь/крафт) + кнопка
+	_menu_panel = MenuPanelScn.new()
+	root.add_child(_menu_panel)
+	var menu_btn := Button.new()
+	menu_btn.text = "Меню"
+	menu_btn.anchor_left = 1.0
+	menu_btn.anchor_right = 1.0
+	menu_btn.offset_left = -16.0 - 130.0
+	menu_btn.offset_right = -16.0
+	menu_btn.offset_top = 12.0
+	menu_btn.offset_bottom = 12.0 + 56.0
+	menu_btn.add_theme_font_size_override("font_size", 24)
+	menu_btn.pressed.connect(_toggle_menu)
+	root.add_child(menu_btn)
+
+
+func _toggle_menu() -> void:
+	if _menu_panel:
+		_menu_panel.visible = not _menu_panel.visible
 
 
 func _anchor_bottom_right(btn: Button, bw: int, bh: int, gap_left: int) -> void:

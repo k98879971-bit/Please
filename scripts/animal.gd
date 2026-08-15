@@ -1,5 +1,5 @@
 extends Node2D
-## Животное: блуждает по суше, отскакивает от воды. Имеет HP, получает урон от удара игрока.
+## Животное: блуждает по суше, отскакивает от воды. Имеет HP, при гибели роняет мясо.
 
 enum Kind { CHICKEN, SHEEP, COW }
 
@@ -14,6 +14,14 @@ const HP := {
 	Kind.SHEEP: 2,
 	Kind.COW: 3,
 }
+
+const MEAT := {
+	Kind.CHICKEN: 1,
+	Kind.SHEEP: 2,
+	Kind.COW: 3,
+}
+
+const PickupScn := preload("res://scripts/pickup.gd")
 
 @export var kind: int = Kind.SHEEP
 
@@ -52,17 +60,28 @@ func _pick_wander() -> void:
 	_timer = randf_range(1.2, 3.5)
 
 
-func take_hit(from_pos: Vector2) -> void:
-	hp -= 1
+func take_hit(damage: int, from_pos: Vector2) -> void:
+	hp -= damage
 	if hp <= 0:
+		_drop_meat()
 		queue_free()
 		return
-	# отбрасывание от игрока
 	var push := global_position - from_pos
 	if push.length() > 0.1:
 		global_position += push.normalized() * 14.0
 		_dir = push.normalized()
 	_timer = 0.4
+
+
+func _drop_meat() -> void:
+	var n: int = MEAT[kind]
+	for _i in range(n):
+		var pk = PickupScn.new()
+		pk.item_id = "meat"
+		pk.global_position = global_position + Vector2(randf_range(-14, 14), randf_range(-14, 14))
+		var ent = get_parent()
+		if ent:
+			ent.add_child(pk)
 
 
 func _build_visual() -> void:

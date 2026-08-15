@@ -1,10 +1,16 @@
 extends Node2D
-## Дерево-заглушка: ствол + крона. Спавнится скриптом мира. Начало координат — у основания.
+## Дерево: добывается ударами, роняет древесину. Origin — у основания.
+
+const MAX_HP := 3
+const PickupScn := preload("res://scripts/pickup.gd")
 
 @export var scale_rand: float = 1.0
 
+var hp := MAX_HP
+
 
 func _ready() -> void:
+	add_to_group("trees")
 	var s := scale_rand
 	var trunk := Polygon2D.new()
 	trunk.polygon = PackedVector2Array([
@@ -23,6 +29,22 @@ func _ready() -> void:
 	canopy2.color = Color(0.26, 0.55, 0.24)
 	canopy2.position = Vector2(-3, -26)
 	add_child(canopy2)
+
+
+func take_hit(damage: int) -> void:
+	hp -= damage
+	_spawn_pickup("wood")
+	if hp <= 0:
+		queue_free()
+
+
+func _spawn_pickup(item_id: String) -> void:
+	var pk = PickupScn.new()
+	pk.item_id = item_id
+	pk.global_position = global_position + Vector2(randf_range(-8, 8), randf_range(-6, 10))
+	var ent = get_parent()
+	if ent:
+		ent.add_child(pk)
 
 
 func _circle(r: float, n: int) -> PackedVector2Array:
