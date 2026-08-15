@@ -1,20 +1,11 @@
 extends Control
-## Инвентарь-хотбар по центру внизу: ресурсы + имеющиеся инструменты (с прочностью).
+## Инвентарь-хотбар по центру внизу. В ячейках видно название предмета + число.
 ## Тап по инструменту — экипировать. Цвет инструмента краснеет по мере износа.
+
+const ID := preload("res://scripts/item_data.gd")
 
 const RES := ["wood", "meat", "fish", "stone"]
 const TOOL_ORDER := ["axe", "sword", "bow", "crossbow", "rod", "pickaxe", "stone_axe", "stone_sword", "stone_bow", "stone_crossbow", "stone_rod", "stone_pickaxe"]
-
-const COLORS := {
-	"wood": Color(0.50, 0.34, 0.18), "meat": Color(0.85, 0.25, 0.25),
-	"fish": Color(0.30, 0.60, 0.90), "stone": Color(0.55, 0.55, 0.58),
-	"axe": Color(0.50, 0.50, 0.52), "sword": Color(0.82, 0.82, 0.88),
-	"bow": Color(0.32, 0.60, 0.32), "crossbow": Color(0.30, 0.30, 0.35),
-	"rod": Color(0.72, 0.60, 0.40), "pickaxe": Color(0.55, 0.45, 0.35),
-	"stone_axe": Color(0.45, 0.45, 0.48), "stone_sword": Color(0.60, 0.60, 0.65),
-	"stone_bow": Color(0.40, 0.50, 0.40), "stone_crossbow": Color(0.35, 0.35, 0.40),
-	"stone_rod": Color(0.60, 0.55, 0.45), "stone_pickaxe": Color(0.50, 0.45, 0.40),
-}
 
 var _player
 var _hbox: HBoxContainer
@@ -29,7 +20,7 @@ func _ready() -> void:
 	offset_left = 0.0
 	offset_right = 0.0
 	offset_bottom = -14.0
-	offset_top = -14.0 - 60.0
+	offset_top = -14.0 - 64.0
 	_player = get_tree().get_first_node_in_group("player")
 	_hbox = HBoxContainer.new()
 	_hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -53,12 +44,12 @@ func _rebuild() -> void:
 
 func _add(id: String, is_tool: bool) -> void:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(54, 54)
+	b.custom_minimum_size = Vector2(58, 58)
 	var num: int = Inv.durability_of(id) if is_tool else Inv.count(id)
-	b.text = str(num)
+	b.text = "%s\n%d" % [ID.NAMES.get(id, id), num]
 	if is_tool:
 		b.pressed.connect(_equip.bind(id))
-	var base: Color = COLORS.get(id, Color.GRAY)
+	var base: Color = ID.COLORS.get(id, Color.GRAY)
 	var equipped: bool = (_player != null) and _player.equipped == id
 	_style(b, base, equipped, is_tool, id)
 	_hbox.add_child(b)
@@ -97,4 +88,4 @@ func _style(b: Button, base: Color, equipped: bool, is_tool: bool, id: String) -
 	b.add_theme_stylebox_override("hover", sb)
 	b.add_theme_stylebox_override("pressed", sb)
 	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_font_size_override("font_size", 18)
+	b.add_theme_font_size_override("font_size", 12)

@@ -3,12 +3,15 @@ extends Node2D
 
 const TREE_FOREST_CHANCE := 0.15
 const TREE_GRASS_CHANCE := 0.025
-const ORE_CHANCE := 0.25
+const ORE_ROCK_CHANCE := 0.6
+const ORE_GRASS_CHANCE := 0.04
 
 const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
 const FishScn := preload("res://scripts/fish.gd")
 const OreScn := preload("res://scripts/ore.gd")
+const BanditScn := preload("res://scripts/bandit.gd")
+const ChestScn := preload("res://scripts/chest.gd")
 const MinimapScn := preload("res://scripts/minimap.gd")
 const HPBarScn := preload("res://scripts/hpbar.gd")
 const StaminaBarScn := preload("res://scripts/staminabar.gd")
@@ -30,15 +33,19 @@ const WNAMES := {
 var _rng := RandomNumberGenerator.new()
 var _menu_panel
 var _equip_label: Label
+var _base_positions: Array = []
 
 
 func _ready() -> void:
 	_rng.seed = 24601
-	_player.global_position = _terrain.find_spawn()
+	var sp: Vector2 = _terrain.find_spawn()
+	_player.global_position = sp
+	_player.spawn_pos = sp
 	_spawn_trees()
 	_spawn_ore()
 	_spawn_animals()
 	_spawn_fish()
+	_spawn_bases()
 	_build_ui()
 
 
@@ -68,7 +75,13 @@ func _spawn_ore() -> void:
 	for x in range(_terrain.WORLD_W):
 		for y in range(_terrain.WORLD_H):
 			var cell := Vector2i(x, y)
-			if _terrain.tile_at(_terrain.map_to_local(cell)) == _terrain.T.ROCK and _rng.randf() < ORE_CHANCE:
+			var tile = _terrain.tile_at(_terrain.map_to_local(cell))
+			var chance := 0.0
+			if tile == _terrain.T.ROCK:
+				chance = ORE_ROCK_CHANCE
+			elif tile == _terrain.T.GRASS:
+				chance = ORE_GRASS_CHANCE
+			if chance > 0.0 and _rng.randf() < chance:
 				var o = OreScn.new()
 				o.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(-4, 8))
 				_entities.add_child(o)
@@ -89,6 +102,48 @@ func _spawn_fish() -> void:
 		var f = FishScn.new()
 		f.position = _terrain.map_to_local(_terrain.random_water_tile(_rng))
 		_entities.add_child(f)
+
+
+func _spawn_bases() -> void:
+	var made := 0
+	var attempts := 0
+	while made < 3 and attempts < 600:
+		attempts += 1
+		var cell: Vector2i = _terrain.random_land_tile(_rng)
+		var pos: Vector2 = _terrain.map_to_local(cell)
+		if pos.distance_to(_player.global_position) < 1100.0:
+			continue
+		var ok := true
+		for bp in _base_positions:
+			if pos.distance_to(bp) < 900.0:
+				ok = false
+				break
+		if not ok:
+			continue
+		_base_positions.append(pos)
+		_make_base(pos)
+		made += 1
+
+
+func _make_base(pos: Vector2) -> void:
+	var tent := Node2D.new()
+	var t := Polygon2D.new()
+	t.polygon = PackedVector2Array([Vector2(-22, 16), Vector2(22, 16), Vector2(0, -22)])
+	t.color = Color(0.50, 0.30, 0.20)
+	tent.add_child(t)
+	tent.position = pos + Vector2(-30, -10)
+	tent.z_index = 1
+	_entities.add_child(tent)
+
+	var ch = ChestScn.new()
+	ch.position = pos + Vector2(0, 20)
+	_entities.add_child(ch)
+
+	for i in range(3):
+		var b = BanditScn.new()
+		var a := i * TAU / 3.0
+		b.position = pos + Vector2(cos(a), sin(a)) * 55.0
+		_entities.add_child(b)
 
 
 func _build_ui() -> void:
@@ -150,6 +205,8 @@ func _build_ui() -> void:
 func _toggle_menu() -> void:
 	if _menu_panel:
 		_menu_panel.visible = not _menu_panel.visible
+		if _menu_panel.visible:
+			_menu_panel.rebuild()
 
 
 func _stack(btn: Button, idx: int) -> void:

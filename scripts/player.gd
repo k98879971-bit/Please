@@ -1,5 +1,5 @@
 extends CharacterBody2D
-## Игрок. HP=100, выносливость=50. Инструменты с уроном и прочностью (изнашиваются).
+## Игрок. HP=100, выносливость=50. Инструменты с прочностью. Открывает сундуки. Респавн при смерти.
 
 @export var speed: float = 260.0
 @export var sprint_mult: float = 1.6
@@ -8,7 +8,6 @@ const MAX_HP := 100
 const STAMINA_MAX := 50.0
 const ProjectileScn := preload("res://scripts/projectile.gd")
 
-# Инструменты: урон/дальность/стрелковое/может рубить/может добывать руду/удочка.
 const TOOLS := {
 	"fist": {"damage": 5, "range": 80.0, "ranged": false, "can_chop": true, "can_mine": false, "rod": false},
 	"axe": {"damage": 25, "range": 95.0, "ranged": false, "can_chop": true, "can_mine": false, "rod": false},
@@ -29,6 +28,7 @@ var hp := MAX_HP
 var hp_max := MAX_HP
 var stamina := STAMINA_MAX
 var equipped := "fist"
+var spawn_pos := Vector2.ZERO
 var _fish_cd := 0.0
 var _facing: Node2D
 
@@ -43,6 +43,9 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if hp <= 0:
+		_respawn()
+		return
 	if _fish_cd > 0.0:
 		_fish_cd -= delta
 	var inp := _keyboard_vector()
@@ -71,6 +74,13 @@ func take_damage(amount: int) -> void:
 	hp = clampi(hp - amount, 0, hp_max)
 
 
+func _respawn() -> void:
+	hp = MAX_HP
+	stamina = STAMINA_MAX
+	equipped = "fist"
+	global_position = spawn_pos
+
+
 func _attack() -> void:
 	var w: Dictionary = TOOLS.get(equipped, TOOLS["fist"])
 	if w.ranged:
@@ -79,12 +89,16 @@ func _attack() -> void:
 		_spawn_swing()
 		_melee(int(w.damage), float(w.range), bool(w.can_chop), bool(w.can_mine))
 	_wear_tool()
+	_try_open_chest()
 
 
 func _melee(damage: int, rng: float, can_chop: bool, can_mine: bool) -> void:
 	for a in get_tree().get_nodes_in_group("animals"):
 		if is_instance_valid(a) and global_position.distance_to(a.global_position) < rng:
 			a.take_hit(damage, global_position)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and global_position.distance_to(e.global_position) < rng:
+			e.take_hit(damage, global_position)
 	if can_chop:
 		for t in get_tree().get_nodes_in_group("trees"):
 			if is_instance_valid(t) and global_position.distance_to(t.global_position) < rng:
@@ -93,6 +107,13 @@ func _melee(damage: int, rng: float, can_chop: bool, can_mine: bool) -> void:
 		for o in get_tree().get_nodes_in_group("ore"):
 			if is_instance_valid(o) and global_position.distance_to(o.global_position) < rng:
 				o.take_hit(damage)
+
+
+func _try_open_chest() -> void:
+	for c in get_tree().get_nodes_in_group("chests"):
+		if is_instance_valid(c) and not c.opened and global_position.distance_to(c.global_position) < 70.0:
+			c.open()
+			return
 
 
 func _try_fish() -> void:
