@@ -1,12 +1,11 @@
 ;
-; Pixel Survival — Godot 4 project
+; Pixel Survival 3D — Godot 4 project
 ;
 config_version=5
 
 [application]
 
-config/name="Pixel Survival"
-config/description="2D pixel-art open-world survival."
+config/name="Pixel Survival 3D"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.png"
@@ -15,9 +14,6 @@ config/icon="res://icon.png"
 
 Controls="*res://scripts/controls.gd"
 Inv="*res://scripts/inv.gd"
-GS="*res://scripts/gs.gd"
-Save="*res://scripts/save.gd"
-Run="*res://scripts/run.gd"
 
 [display]
 
@@ -30,6 +26,3 @@ window/stretch/aspect="expand"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/canvas_textures/default_texture_filter=0
-textures/vram_compression/import_etc2_astc=true
-environment/defaults/default_clear_color=Color(0.22, 0.42, 0.18, 1)
