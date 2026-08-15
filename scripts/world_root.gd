@@ -1,23 +1,12 @@
 extends Node2D
-## Корневая сцена: мир + сущности + UI. Случайный сид, сохранение/загрузка, респавн деревьев.
+## Корневая сцена (вид сбоку): мир-срез + игрок + UI. Случайный сид, сейв/загрузка, респавн деревьев.
 
-const TREE_FOREST_CHANCE := 0.15
-const TREE_GRASS_CHANCE := 0.025
-const ORE_ROCK_CHANCE := 0.6
-const ORE_GRASS_CHANCE := 0.04
-const MIN_TREES := 350
+const MIN_TREES := 40
 const SAVE_EVERY := 20.0
-const RESPAWN_EVERY := 10.0
+const RESPAWN_EVERY := 12.0
 
 const TreeScn := preload("res://scripts/tree.gd")
-const AnimalScn := preload("res://scripts/animal.gd")
-const FishScn := preload("res://scripts/fish.gd")
-const OreScn := preload("res://scripts/ore.gd")
-const BanditScn := preload("res://scripts/bandit.gd")
-const ChestScn := preload("res://scripts/chest.gd")
-const MinimapScn := preload("res://scripts/minimap.gd")
 const HPBarScn := preload("res://scripts/hpbar.gd")
-const StaminaBarScn := preload("res://scripts/staminabar.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
 const HotbarScn := preload("res://scripts/hotbar.gd")
 const MenuPanelScn := preload("res://scripts/menupanel.gd")
@@ -36,30 +25,29 @@ const WNAMES := {
 var _rng := RandomNumberGenerator.new()
 var _menu_panel
 var _equip_label: Label
-var _base_positions: Array = []
+var _world_seed := 0
 var _save_timer := 0.0
 var _respawn_timer := 0.0
-var _world_seed := 0
 
 
 func _ready() -> void:
+	var smode := ""
+	if Save.has_save():
+		smode = String(Save.data.get("mode", ""))
 	if Run.is_new:
 		_world_seed = Run.world_seed
 		Run.is_new = false
-	elif Save.has_save():
+	elif Save.has_save() and smode == "side":
 		_world_seed = int(Save.data.get("seed", 12345))
 	else:
 		_world_seed = randi()
-	_rng.seed = _world_seed + 2
+	_rng.seed = _world_seed + 7
 	_terrain.generate(_world_seed)
+
 	var sp: Vector2 = _terrain.find_spawn()
 	_player.global_position = sp
 	_player.spawn_pos = sp
 	_spawn_trees()
-	_spawn_ore()
-	_spawn_animals()
-	_spawn_fish()
-	_spawn_bases()
 	_build_ui()
 	_apply_save()
 
@@ -94,22 +82,22 @@ func _save() -> void:
 		return
 	var snap := Inv.snapshot()
 	var state := {
+		"mode": "side",
 		"seed": _world_seed,
 		"player": {
 			"x": _player.global_position.x, "y": _player.global_position.y,
-			"hp": _player.hp, "stamina": _player.stamina, "equipped": _player.equipped,
+			"hp": _player.hp, "equipped": _player.equipped,
 		},
 		"items": snap["items"],
 		"dur": snap["dur"],
-		"removed_trees": _to_arr(GS.removed_trees),
-		"removed_ore": _to_arr(GS.removed_ore),
-		"opened_chests": _to_arr(GS.opened_chests),
+		"mined_cells": _to_arr_vi(GS.mined_cells),
+		"removed_trees": _to_arr_v2(GS.removed_trees),
 	}
 	Save.write(state)
 
 
 func _apply_save() -> void:
-	if not Save.has_save():
+	if String(Save.data.get("mode", "")) != "side":
 		return
 	var d: Dictionary = Save.data
 	Inv.restore({"items": d.get("items", {}), "dur": d.get("dur", {})})
@@ -117,25 +105,31 @@ func _apply_save() -> void:
 	if p.size() > 0:
 		_player.global_position = Vector2(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
 		_player.hp = int(p.get("hp", _player.hp))
-		_player.stamina = float(p.get("stamina", _player.stamina))
 		_player.equipped = String(p.get("equipped", "fist"))
+	GS.mined_cells = _to_vecsi(d.get("mined_cells", []))
 	GS.removed_trees = _to_vecs(d.get("removed_trees", []))
-	GS.removed_ore = _to_vecs(d.get("removed_ore", []))
-	GS.opened_chests = _to_vecs(d.get("opened_chests", []))
+	for c in GS.mined_cells:
+		_terrain.mine_cell(c)
 	_free_at("trees", GS.removed_trees)
-	_free_at("ore", GS.removed_ore)
-	for c in get_tree().get_nodes_in_group("chests"):
-		if not is_instance_valid(c):
-			continue
-		for op in GS.opened_chests:
-			if c.global_position.distance_to(op) < 6.0:
-				c.mark_opened()
-				break
 
 
-func _to_arr(vecs: Array) -> Array:
+func _to_arr_vi(arr: Array) -> Array:
 	var out: Array = []
-	for v in vecs:
+	for v in arr:
+		out.append([v.x, v.y])
+	return out
+
+
+func _to_vecsi(arr) -> Array:
+	var out: Array = []
+	for a in arr:
+		out.append(Vector2i(int(a[0]), int(a[1])))
+	return out
+
+
+func _to_arr_v2(arr: Array) -> Array:
+	var out: Array = []
+	for v in arr:
 		out.append([v.x, v.y])
 	return out
 
@@ -154,119 +148,30 @@ func _free_at(group: String, positions: Array) -> void:
 		if not is_instance_valid(n):
 			continue
 		for p in positions:
-			if n.global_position.distance_to(p) < 2.0:
+			if n.global_position.distance_to(p) < 3.0:
 				n.queue_free()
 				break
 
 
-# --- Респавн деревьев ---
+# --- Деревья ---
+
+func _spawn_trees() -> void:
+	for _i in range(45):
+		var cell: Vector2i = _terrain.random_grass_tile(_rng)
+		var tree = TreeScn.new()
+		tree.scale_rand = _rng.randf_range(0.7, 1.1)
+		tree.position = _terrain.map_to_local(cell) - Vector2(0, 8)
+		_entities.add_child(tree)
+
 
 func _respawn_trees() -> void:
 	var count := get_tree().get_nodes_in_group("trees").size()
-	var spawned := 0
-	while count < MIN_TREES and spawned < 30:
-		spawned += 1
-		var cell: Vector2i = _terrain.random_land_tile(_rng)
-		var t = _terrain.tile_at(_terrain.map_to_local(cell))
-		if t == _terrain.T.FOREST or t == _terrain.T.GRASS:
-			var tree = TreeScn.new()
-			tree.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(0, 10))
-			_entities.add_child(tree)
-			count += 1
-
-
-# --- Спавн мира ---
-
-func _spawn_trees() -> void:
-	for x in range(_terrain.WORLD_W):
-		for y in range(_terrain.WORLD_H):
-			var cell := Vector2i(x, y)
-			var t = _terrain.tile_at(_terrain.map_to_local(cell))
-			var chance := 0.0
-			if t == _terrain.T.FOREST:
-				chance = TREE_FOREST_CHANCE
-			elif t == _terrain.T.GRASS:
-				chance = TREE_GRASS_CHANCE
-			if chance > 0.0 and _rng.randf() < chance:
-				var tree = TreeScn.new()
-				tree.scale_rand = _rng.randf_range(0.8, 1.25)
-				tree.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(0, 10))
-				_entities.add_child(tree)
-
-
-func _spawn_ore() -> void:
-	for x in range(_terrain.WORLD_W):
-		for y in range(_terrain.WORLD_H):
-			var cell := Vector2i(x, y)
-			var tile = _terrain.tile_at(_terrain.map_to_local(cell))
-			var chance := 0.0
-			if tile == _terrain.T.ROCK:
-				chance = ORE_ROCK_CHANCE
-			elif tile == _terrain.T.GRASS:
-				chance = ORE_GRASS_CHANCE
-			if chance > 0.0 and _rng.randf() < chance:
-				var o = OreScn.new()
-				o.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(-4, 8))
-				_entities.add_child(o)
-
-
-func _spawn_animals() -> void:
-	var counts := {AnimalScn.Kind.CHICKEN: 14, AnimalScn.Kind.SHEEP: 10, AnimalScn.Kind.COW: 7}
-	for kind in counts:
-		for _i in range(counts[kind]):
-			var a = AnimalScn.new()
-			a.kind = kind
-			a.position = _terrain.map_to_local(_terrain.random_land_tile(_rng))
-			_entities.add_child(a)
-
-
-func _spawn_fish() -> void:
-	for _i in range(20):
-		var f = FishScn.new()
-		f.position = _terrain.map_to_local(_terrain.random_water_tile(_rng))
-		_entities.add_child(f)
-
-
-func _spawn_bases() -> void:
-	var made := 0
-	var attempts := 0
-	while made < 3 and attempts < 600:
-		attempts += 1
-		var cell: Vector2i = _terrain.random_land_tile(_rng)
-		var pos: Vector2 = _terrain.map_to_local(cell)
-		if pos.distance_to(_player.global_position) < 1100.0:
-			continue
-		var ok := true
-		for bp in _base_positions:
-			if pos.distance_to(bp) < 900.0:
-				ok = false
-				break
-		if not ok:
-			continue
-		_base_positions.append(pos)
-		_make_base(pos)
-		made += 1
-
-
-func _make_base(pos: Vector2) -> void:
-	var tent := Node2D.new()
-	var t := Polygon2D.new()
-	t.polygon = PackedVector2Array([Vector2(-22, 16), Vector2(22, 16), Vector2(0, -22)])
-	t.color = Color(0.50, 0.30, 0.20)
-	tent.add_child(t)
-	tent.position = pos + Vector2(-30, -10)
-	tent.z_index = 1
-	_entities.add_child(tent)
-
-	var ch = ChestScn.new()
-	ch.position = pos + Vector2(0, 20)
-	_entities.add_child(ch)
-
-	for i in range(3):
-		var b = BanditScn.new()
-		var a := i * TAU / 3.0
-		b.position = pos + Vector2(cos(a), sin(a)) * 55.0
-		_entities.add_child(b)
+	while count < MIN_TREES:
+		var cell: Vector2i = _terrain.random_grass_tile(_rng)
+		var tree = TreeScn.new()
+		tree.position = _terrain.map_to_local(cell) - Vector2(0, 8)
+		_entities.add_child(tree)
+		count += 1
 
 
 # --- UI ---
@@ -280,37 +185,28 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
 
-	root.add_child(MinimapScn.new())
 	root.add_child(HPBarScn.new())
-	root.add_child(StaminaBarScn.new())
 	root.add_child(JoystickScn.new())
 	root.add_child(HotbarScn.new())
 
 	_equip_label = Label.new()
 	_equip_label.offset_left = 12.0
-	_equip_label.offset_top = 250.0
-	_equip_label.offset_right = 12.0 + 170.0
-	_equip_label.offset_bottom = 274.0
+	_equip_label.offset_top = 12.0
+	_equip_label.offset_right = 12.0 + 200.0
+	_equip_label.offset_bottom = 36.0
 	root.add_child(_equip_label)
 
-	var run_btn := Button.new()
-	run_btn.text = "БЕГ"
-	_stack(run_btn, 0)
-	run_btn.button_down.connect(func() -> void: Controls.sprint = true)
-	run_btn.button_up.connect(func() -> void: Controls.sprint = false)
-	root.add_child(run_btn)
+	var jump_btn := Button.new()
+	jump_btn.text = "ПРЫЖОК"
+	_stack(jump_btn, 0)
+	jump_btn.button_down.connect(func() -> void: Controls.jump_queued = true)
+	root.add_child(jump_btn)
 
 	var hit_btn := Button.new()
-	hit_btn.text = "УДАР"
+	hit_btn.text = "УДАР/КОПАТЬ"
 	_stack(hit_btn, 1)
 	hit_btn.button_down.connect(func() -> void: Controls.attack_queued = true)
 	root.add_child(hit_btn)
-
-	var fish_btn := Button.new()
-	fish_btn.text = "Рыба"
-	_stack(fish_btn, 2)
-	fish_btn.button_down.connect(func() -> void: Controls.fish_queued = true)
-	root.add_child(fish_btn)
 
 	_menu_panel = MenuPanelScn.new()
 	root.add_child(_menu_panel)
@@ -335,9 +231,9 @@ func _toggle_menu() -> void:
 
 
 func _stack(btn: Button, idx: int) -> void:
-	var bw := 120
-	var bh := 72
-	var gap := 10
+	var bw := 150
+	var bh := 80
+	var gap := 12
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
@@ -347,4 +243,4 @@ func _stack(btn: Button, idx: int) -> void:
 	var bottom := -16 - idx * (bh + gap)
 	btn.offset_bottom = bottom
 	btn.offset_top = bottom - bh
-	btn.add_theme_font_size_override("font_size", 26)
+	btn.add_theme_font_size_override("font_size", 24)

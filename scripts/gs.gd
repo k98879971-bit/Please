@@ -1,6 +1,5 @@
 extends Node
-## Состояние мира, изменённое игроком (для корректного сохранения).
+## Изменённые игроком элементы мира (для корректного сохранения в виде сбоку).
 
-var removed_trees: Array = []
-var removed_ore: Array = []
-var opened_chests: Array = []
+var mined_cells: Array = []    # Vector2i — выкопанные тайлы
+var removed_trees: Array = []  # Vector2 — срубленные деревья
