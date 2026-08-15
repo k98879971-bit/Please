@@ -14,7 +14,15 @@ func open() -> void:
 	if opened:
 		return
 	opened = true
+	GS.opened_chests.append(global_position)
 	_loot()
+	_build()
+
+
+func mark_opened() -> void:
+	if opened:
+		return
+	opened = true
 	_build()
 
 

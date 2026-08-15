@@ -15,6 +15,8 @@ config/icon="res://icon.svg"
 
 Controls="*res://scripts/controls.gd"
 Inv="*res://scripts/inv.gd"
+GS="*res://scripts/gs.gd"
+Save="*res://scripts/save.gd"
 
 [display]
 

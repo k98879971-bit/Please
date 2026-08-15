@@ -61,3 +61,15 @@ func use_tool(id: String) -> void:
 	else:
 		_dur[id] = d
 	changed.emit()
+
+
+func snapshot() -> Dictionary:
+	return {"items": _items.duplicate(true), "dur": _dur.duplicate(true)}
+
+
+func restore(snap: Dictionary) -> void:
+	var it: Dictionary = snap.get("items", {})
+	var du: Dictionary = snap.get("dur", {})
+	_items = it.duplicate(true)
+	_dur = du.duplicate(true)
+	changed.emit()

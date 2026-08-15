@@ -35,6 +35,7 @@ func take_hit(damage: int) -> void:
 	hp -= damage
 	_spawn_pickup("wood")
 	if hp <= 0:
+		GS.removed_trees.append(global_position)
 		queue_free()
 
 

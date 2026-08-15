@@ -1,10 +1,13 @@
 extends Node2D
-## Корневая сцена: мир + сущности + UI.
+## Корневая сцена: мир + сущности + UI. Сохранение/загрузка + респавн деревьев.
 
 const TREE_FOREST_CHANCE := 0.15
 const TREE_GRASS_CHANCE := 0.025
 const ORE_ROCK_CHANCE := 0.6
 const ORE_GRASS_CHANCE := 0.04
+const MIN_TREES := 350
+const SAVE_EVERY := 20.0
+const RESPAWN_EVERY := 10.0
 
 const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
@@ -34,6 +37,8 @@ var _rng := RandomNumberGenerator.new()
 var _menu_panel
 var _equip_label: Label
 var _base_positions: Array = []
+var _save_timer := 0.0
+var _respawn_timer := 0.0
 
 
 func _ready() -> void:
@@ -47,12 +52,115 @@ func _ready() -> void:
 	_spawn_fish()
 	_spawn_bases()
 	_build_ui()
+	_apply_save()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _player and _equip_label:
 		_equip_label.text = "Оружие: " + WNAMES.get(_player.equipped, _player.equipped)
+	_save_timer += delta
+	if _save_timer >= SAVE_EVERY:
+		_save_timer = 0.0
+		_save()
+	_respawn_timer += delta
+	if _respawn_timer >= RESPAWN_EVERY:
+		_respawn_timer = 0.0
+		_respawn_trees()
 
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		_save()
+
+
+# --- Сохранение / загрузка ---
+
+func _save() -> void:
+	if not is_instance_valid(_player):
+		return
+	var snap := Inv.snapshot()
+	var state := {
+		"player": {
+			"x": _player.global_position.x, "y": _player.global_position.y,
+			"hp": _player.hp, "stamina": _player.stamina, "equipped": _player.equipped,
+		},
+		"items": snap["items"],
+		"dur": snap["dur"],
+		"removed_trees": _to_arr(GS.removed_trees),
+		"removed_ore": _to_arr(GS.removed_ore),
+		"opened_chests": _to_arr(GS.opened_chests),
+	}
+	Save.write(state)
+
+
+func _apply_save() -> void:
+	if not Save.has_save():
+		return
+	var d: Dictionary = Save.data
+	Inv.restore({"items": d.get("items", {}), "dur": d.get("dur", {})})
+	var p: Dictionary = d.get("player", {})
+	if p.size() > 0:
+		_player.global_position = Vector2(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+		_player.hp = int(p.get("hp", _player.hp))
+		_player.stamina = float(p.get("stamina", _player.stamina))
+		_player.equipped = String(p.get("equipped", "fist"))
+	GS.removed_trees = _to_vecs(d.get("removed_trees", []))
+	GS.removed_ore = _to_vecs(d.get("removed_ore", []))
+	GS.opened_chests = _to_vecs(d.get("opened_chests", []))
+	_free_at("trees", GS.removed_trees)
+	_free_at("ore", GS.removed_ore)
+	for c in get_tree().get_nodes_in_group("chests"):
+		if not is_instance_valid(c):
+			continue
+		for op in GS.opened_chests:
+			if c.global_position.distance_to(op) < 6.0:
+				c.mark_opened()
+				break
+
+
+func _to_arr(vecs: Array) -> Array:
+	var out: Array = []
+	for v in vecs:
+		out.append([v.x, v.y])
+	return out
+
+
+func _to_vecs(arr) -> Array:
+	var out: Array = []
+	for a in arr:
+		out.append(Vector2(float(a[0]), float(a[1])))
+	return out
+
+
+func _free_at(group: String, positions: Array) -> void:
+	if positions.is_empty():
+		return
+	for n in get_tree().get_nodes_in_group(group):
+		if not is_instance_valid(n):
+			continue
+		for p in positions:
+			if n.global_position.distance_to(p) < 2.0:
+				n.queue_free()
+				break
+
+
+# --- Респавн деревьев ---
+
+func _respawn_trees() -> void:
+	var count := get_tree().get_nodes_in_group("trees").size()
+	var spawned := 0
+	while count < MIN_TREES and spawned < 30:
+		spawned += 1
+		var cell: Vector2i = _terrain.random_land_tile(_rng)
+		var t = _terrain.tile_at(_terrain.map_to_local(cell))
+		if t == _terrain.T.FOREST or t == _terrain.T.GRASS:
+			var tree = TreeScn.new()
+			tree.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(0, 10))
+			_entities.add_child(tree)
+			count += 1
+
+
+# --- Спавн мира ---
 
 func _spawn_trees() -> void:
 	for x in range(_terrain.WORLD_W):
@@ -145,6 +253,8 @@ func _make_base(pos: Vector2) -> void:
 		b.position = pos + Vector2(cos(a), sin(a)) * 55.0
 		_entities.add_child(b)
 
+
+# --- UI ---
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()

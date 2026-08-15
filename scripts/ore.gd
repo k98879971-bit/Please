@@ -29,6 +29,7 @@ func take_hit(_damage: int) -> void:
 	hp -= 1
 	_spawn_pickup("stone")
 	if hp <= 0:
+		GS.removed_ore.append(global_position)
 		queue_free()
 
 
