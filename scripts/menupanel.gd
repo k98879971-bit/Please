@@ -1,5 +1,6 @@
 extends Control
 ## Меню крафта по центру: для каждого рецепта — ячейка результата + ячейки нужных материалов + кнопка.
+## Внизу — кнопка «Сохранить и выйти».
 
 const ID := preload("res://scripts/item_data.gd")
 
@@ -68,6 +69,17 @@ func _build_skeleton() -> void:
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rows.add_theme_constant_override("separation", 6)
 	sc.add_child(_rows)
+
+	var qbtn := Button.new()
+	qbtn.text = "Сохранить и выйти"
+	qbtn.pressed.connect(_save_quit)
+	col.add_child(qbtn)
+
+
+func _save_quit() -> void:
+	var w = get_tree().current_scene
+	if w and w.has_method("save_and_quit"):
+		w.save_and_quit()
 
 
 func rebuild() -> void:

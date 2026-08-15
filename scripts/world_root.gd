@@ -1,5 +1,5 @@
 extends Node2D
-## Корневая сцена: мир + сущности + UI. Сохранение/загрузка + респавн деревьев.
+## Корневая сцена: мир + сущности + UI. Случайный сид, сохранение/загрузка, респавн деревьев.
 
 const TREE_FOREST_CHANCE := 0.15
 const TREE_GRASS_CHANCE := 0.025
@@ -39,10 +39,19 @@ var _equip_label: Label
 var _base_positions: Array = []
 var _save_timer := 0.0
 var _respawn_timer := 0.0
+var _world_seed := 0
 
 
 func _ready() -> void:
-	_rng.seed = 24601
+	if Run.is_new:
+		_world_seed = Run.world_seed
+		Run.is_new = false
+	elif Save.has_save():
+		_world_seed = int(Save.data.get("seed", 12345))
+	else:
+		_world_seed = randi()
+	_rng.seed = _world_seed + 2
+	_terrain.generate(_world_seed)
 	var sp: Vector2 = _terrain.find_spawn()
 	_player.global_position = sp
 	_player.spawn_pos = sp
@@ -75,11 +84,17 @@ func _notification(what: int) -> void:
 
 # --- Сохранение / загрузка ---
 
+func save_and_quit() -> void:
+	_save()
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+
+
 func _save() -> void:
 	if not is_instance_valid(_player):
 		return
 	var snap := Inv.snapshot()
 	var state := {
+		"seed": _world_seed,
 		"player": {
 			"x": _player.global_position.x, "y": _player.global_position.y,
 			"hp": _player.hp, "stamina": _player.stamina, "equipped": _player.equipped,

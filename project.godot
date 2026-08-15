@@ -17,6 +17,7 @@ Controls="*res://scripts/controls.gd"
 Inv="*res://scripts/inv.gd"
 GS="*res://scripts/gs.gd"
 Save="*res://scripts/save.gd"
+Run="*res://scripts/run.gd"
 
 [display]
 

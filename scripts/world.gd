@@ -1,5 +1,5 @@
 extends TileMapLayer
-## Процедурная генерация мира + данные для миникарты и спавна сущностей.
+## Процедурная генерация мира + данные для миникарты и спавна. Seed задаётся снаружи (generate).
 
 const TILE_SIZE := 32
 const WORLD_W := 128
@@ -35,16 +35,19 @@ var _moisture := FastNoiseLite.new()
 func _ready() -> void:
 	add_to_group("world")
 	tile_set = _make_tile_set()
-	_setup_noise()
+
+
+func generate(seed: int) -> void:
+	_setup_noise(seed)
 	_generate()
 
 
-func _setup_noise() -> void:
-	_elevation.seed = 1337
+func _setup_noise(seed: int) -> void:
+	_elevation.seed = seed
 	_elevation.frequency = 0.012
 	_elevation.fractal_type = FastNoiseLite.FRACTAL_FBM
 	_elevation.fractal_octaves = 5
-	_moisture.seed = 7331
+	_moisture.seed = seed + 1
 	_moisture.frequency = 0.010
 
 

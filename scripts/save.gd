@@ -23,6 +23,11 @@ func _load() -> void:
 				data = parsed
 
 
+func reload() -> void:
+	data = {}
+	_load()
+
+
 func write(state: Dictionary) -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f:
