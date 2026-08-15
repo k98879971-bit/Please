@@ -1,5 +1,5 @@
 extends Node2D
-## Снаряд (стрела/болт). Летит по направлению, бьёт животных и деревья.
+## Снаряд (стрела/болт). Летит по направлению, бьёт только животных (деревья рубить нельзя).
 
 var dir := Vector2.ZERO
 var speed := 560.0
@@ -25,10 +25,5 @@ func _physics_process(delta: float) -> void:
 	for a in get_tree().get_nodes_in_group("animals"):
 		if is_instance_valid(a) and global_position.distance_to(a.global_position) < 22.0:
 			a.take_hit(damage, global_position)
-			queue_free()
-			return
-	for t in get_tree().get_nodes_in_group("trees"):
-		if is_instance_valid(t) and t.has_method("take_hit") and global_position.distance_to(t.global_position) < 24.0:
-			t.take_hit(damage)
 			queue_free()
 			return

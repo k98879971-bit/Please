@@ -1,15 +1,17 @@
 extends Node2D
-## Корневая сцена: мир + сущности + UI. Спавнит деревья, животных, строит интерфейс.
+## Корневая сцена: мир + сущности + UI. Спавнит деревья, животных, рыбу, строит интерфейс.
 
 const TREE_FOREST_CHANCE := 0.15
 const TREE_GRASS_CHANCE := 0.025
 
 const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
+const FishScn := preload("res://scripts/fish.gd")
 const MinimapScn := preload("res://scripts/minimap.gd")
 const HPBarScn := preload("res://scripts/hpbar.gd")
 const StaminaBarScn := preload("res://scripts/staminabar.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
+const HotbarScn := preload("res://scripts/hotbar.gd")
 const MenuPanelScn := preload("res://scripts/menupanel.gd")
 
 const WNAMES := {
@@ -18,6 +20,7 @@ const WNAMES := {
 	"sword": "Меч",
 	"bow": "Лук",
 	"crossbow": "Арбалет",
+	"rod": "Удочка",
 }
 
 @onready var _terrain = $Terrain
@@ -34,6 +37,7 @@ func _ready() -> void:
 	_player.global_position = _terrain.find_spawn()
 	_spawn_trees()
 	_spawn_animals()
+	_spawn_fish()
 	_build_ui()
 
 
@@ -69,6 +73,13 @@ func _spawn_animals() -> void:
 			_entities.add_child(a)
 
 
+func _spawn_fish() -> void:
+	for _i in range(20):
+		var f = FishScn.new()
+		f.position = _terrain.map_to_local(_terrain.random_water_tile(_rng))
+		_entities.add_child(f)
+
+
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -82,6 +93,7 @@ func _build_ui() -> void:
 	root.add_child(HPBarScn.new())
 	root.add_child(StaminaBarScn.new())
 	root.add_child(JoystickScn.new())
+	root.add_child(HotbarScn.new())
 
 	# Подпись текущего оружия (под полосами)
 	_equip_label = Label.new()
@@ -91,23 +103,27 @@ func _build_ui() -> void:
 	_equip_label.offset_bottom = 274.0
 	root.add_child(_equip_label)
 
-	# Кнопки БЕГ и УДАР (нижний правый угол)
-	var sprint := Button.new()
-	sprint.text = "БЕГ"
-	_anchor_bottom_right(sprint, 130, 90, 0)
-	sprint.add_theme_font_size_override("font_size", 30)
-	sprint.button_down.connect(func() -> void: Controls.sprint = true)
-	sprint.button_up.connect(func() -> void: Controls.sprint = false)
-	root.add_child(sprint)
+	# Кнопки действий (вертикальный столбик, нижний правый угол)
+	var run_btn := Button.new()
+	run_btn.text = "БЕГ"
+	_stack(run_btn, 0)
+	run_btn.button_down.connect(func() -> void: Controls.sprint = true)
+	run_btn.button_up.connect(func() -> void: Controls.sprint = false)
+	root.add_child(run_btn)
 
-	var atk := Button.new()
-	atk.text = "УДАР"
-	_anchor_bottom_right(atk, 130, 90, 130 + 16)
-	atk.add_theme_font_size_override("font_size", 30)
-	atk.button_down.connect(func() -> void: Controls.attack_queued = true)
-	root.add_child(atk)
+	var hit_btn := Button.new()
+	hit_btn.text = "УДАР"
+	_stack(hit_btn, 1)
+	hit_btn.button_down.connect(func() -> void: Controls.attack_queued = true)
+	root.add_child(hit_btn)
 
-	# Меню (инвентарь/крафт) + кнопка
+	var fish_btn := Button.new()
+	fish_btn.text = "Рыба"
+	_stack(fish_btn, 2)
+	fish_btn.button_down.connect(func() -> void: Controls.fish_queued = true)
+	root.add_child(fish_btn)
+
+	# Меню крафта + кнопка
 	_menu_panel = MenuPanelScn.new()
 	root.add_child(_menu_panel)
 	var menu_btn := Button.new()
@@ -128,13 +144,17 @@ func _toggle_menu() -> void:
 		_menu_panel.visible = not _menu_panel.visible
 
 
-func _anchor_bottom_right(btn: Button, bw: int, bh: int, gap_left: int) -> void:
+func _stack(btn: Button, idx: int) -> void:
+	var bw := 120
+	var bh := 72
+	var gap := 10
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
 	btn.anchor_bottom = 1.0
-	var right := -16 - gap_left
-	btn.offset_right = right
-	btn.offset_left = right - bw
-	btn.offset_bottom = -16
-	btn.offset_top = -16 - bh
+	btn.offset_right = -16
+	btn.offset_left = -16 - bw
+	var bottom := -16 - idx * (bh + gap)
+	btn.offset_bottom = bottom
+	btn.offset_top = bottom - bh
+	btn.add_theme_font_size_override("font_size", 26)

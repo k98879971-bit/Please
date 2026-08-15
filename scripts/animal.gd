@@ -10,9 +10,9 @@ const SPEEDS := {
 }
 
 const HP := {
-	Kind.CHICKEN: 1,
-	Kind.SHEEP: 2,
-	Kind.COW: 3,
+	Kind.CHICKEN: 5,
+	Kind.SHEEP: 20,
+	Kind.COW: 50,
 }
 
 const MEAT := {

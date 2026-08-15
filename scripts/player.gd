@@ -1,27 +1,27 @@
 extends CharacterBody2D
-## Игрок. HP=100, выносливость=50 (тратится на бег).
-## Оружие экипируется (кулаки/топор/меч/лук/арбалет). Лук и арбалет — стрелковое.
+## Игрок. HP=100, выносливость=50. Оружие с уроном. Рыбалка удочкой у воды.
 
 @export var speed: float = 260.0
 @export var sprint_mult: float = 1.6
 
 const MAX_HP := 100
 const STAMINA_MAX := 50.0
-const ATTACK_RANGE := 80.0
 const ProjectileScn := preload("res://scripts/projectile.gd")
 
+# Урон: меч 50, арбалет 55, лук 30, топор 25, кулаки 5. can_chop — может рубить деревья.
 const WEAPONS := {
-	"fist": {"damage": 1, "range": 80.0, "ranged": false},
-	"axe": {"damage": 2, "range": 95.0, "ranged": false},
-	"sword": {"damage": 3, "range": 110.0, "ranged": false},
-	"bow": {"damage": 2, "range": 0.0, "ranged": true},
-	"crossbow": {"damage": 4, "range": 0.0, "ranged": true},
+	"fist": {"damage": 5, "range": 80.0, "ranged": false, "can_chop": true},
+	"axe": {"damage": 25, "range": 95.0, "ranged": false, "can_chop": true},
+	"sword": {"damage": 50, "range": 110.0, "ranged": false, "can_chop": false},
+	"bow": {"damage": 30, "range": 0.0, "ranged": true, "can_chop": false},
+	"crossbow": {"damage": 55, "range": 0.0, "ranged": true, "can_chop": false},
 }
 
 var hp := MAX_HP
 var hp_max := MAX_HP
 var stamina := STAMINA_MAX
 var equipped := "fist"
+var _fish_cd := 0.0
 var _facing: Node2D
 
 
@@ -35,6 +35,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _fish_cd > 0.0:
+		_fish_cd -= delta
 	var inp := _keyboard_vector()
 	inp += Controls.move_vector
 	inp = inp.limit_length(1.0)
@@ -52,6 +54,9 @@ func _physics_process(delta: float) -> void:
 	if Controls.attack_queued:
 		Controls.attack_queued = false
 		_attack()
+	if Controls.fish_queued:
+		Controls.fish_queued = false
+		_try_fish()
 
 
 func take_damage(amount: int) -> void:
@@ -64,16 +69,39 @@ func _attack() -> void:
 		_spawn_projectile(int(w.damage))
 	else:
 		_spawn_swing()
-		_melee(int(w.damage), float(w.range))
+		_melee(int(w.damage), float(w.range), bool(w.can_chop))
 
 
-func _melee(damage: int, rng: float) -> void:
+func _melee(damage: int, rng: float, can_chop: bool) -> void:
 	for a in get_tree().get_nodes_in_group("animals"):
 		if is_instance_valid(a) and global_position.distance_to(a.global_position) < rng:
 			a.take_hit(damage, global_position)
-	for t in get_tree().get_nodes_in_group("trees"):
-		if is_instance_valid(t) and global_position.distance_to(t.global_position) < rng:
-			t.take_hit(damage)
+	if can_chop:
+		for t in get_tree().get_nodes_in_group("trees"):
+			if is_instance_valid(t) and global_position.distance_to(t.global_position) < rng:
+				t.take_hit(damage)
+
+
+func _try_fish() -> void:
+	if _fish_cd > 0.0 or not Inv.has("rod"):
+		return
+	var world = get_tree().get_first_node_in_group("world")
+	if not world:
+		return
+	var found := false
+	for r in [44.0, 72.0, 100.0]:
+		for i in range(10):
+			var a := i * TAU / 10.0
+			var p: Vector2 = global_position + Vector2(cos(a), sin(a)) * float(r)
+			if world.is_water_at(p):
+				found = true
+				break
+		if found:
+			break
+	if not found:
+		return
+	Inv.add("fish")
+	_fish_cd = 1.2
 
 
 func _spawn_projectile(damage: int) -> void:

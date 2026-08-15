@@ -112,6 +112,14 @@ func random_land_tile(rng: RandomNumberGenerator) -> Vector2i:
 	return Vector2i(WORLD_W / 2, WORLD_H / 2)
 
 
+func random_water_tile(rng: RandomNumberGenerator) -> Vector2i:
+	for _i in range(3000):
+		var c := Vector2i(rng.randi_range(0, WORLD_W - 1), rng.randi_range(0, WORLD_H - 1))
+		if _is_water(c):
+			return c
+	return Vector2i(WORLD_W / 2, WORLD_H / 2)
+
+
 func make_minimap_texture() -> ImageTexture:
 	var img := Image.create(WORLD_W, WORLD_H, false, Image.FORMAT_RGBA8)
 	for x in range(WORLD_W):
