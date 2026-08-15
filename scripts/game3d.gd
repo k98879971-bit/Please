@@ -141,15 +141,20 @@ func _noise_tex(base: Color, amp: float, seed: int, size := 128) -> ImageTexture
 
 
 # Текстура животного с узором: speckle (крап), spots (пятна), streaks (полосы-щетина), patches (подпалины).
-func _animal_tex(base: Color, accent: Color, mode: String, seed: int, size := 64) -> ImageTexture:
+func _animal_tex(base: Color, accent: Color, mode: String, seed: int, size := 96) -> ImageTexture:
 	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	var p := FastNoiseLite.new()
 	p.seed = seed + 50
 	p.frequency = 0.5
 	p.fractal_octaves = 3
+	var fur := FastNoiseLite.new()
+	fur.seed = seed + 200
+	fur.frequency = 2.5
+	fur.fractal_octaves = 2
 	for y in range(size):
 		for x in range(size):
-			var c := base
+			var fv: float = fur.get_noise_2d(float(x), float(y)) * 0.05
+			var c := Color(clampf(base.r + fv, 0.0, 1.0), clampf(base.g + fv, 0.0, 1.0), clampf(base.b + fv, 0.0, 1.0))
 			if mode == "speckle":
 				if p.get_noise_2d(float(x) * 5.0, float(y) * 5.0) > 0.5:
 					c = base.lerp(accent, 0.6)

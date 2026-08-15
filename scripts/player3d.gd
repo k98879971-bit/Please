@@ -130,20 +130,31 @@ func _build_viewmodel() -> void:
 	_cam.add_child(_vm)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.92, 0.72, 0.55)
-	var arm := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.07
-	cm.bottom_radius = 0.09
-	cm.height = 0.45
-	cm.material = mat
-	arm.mesh = cm
-	arm.position = Vector3(0, -0.18, 0.18)
-	arm.rotation.x = -1.0
-	_vm.add_child(arm)
+	var upper := MeshInstance3D.new()
+	var cm1 := CylinderMesh.new()
+	cm1.top_radius = 0.08
+	cm1.bottom_radius = 0.07
+	cm1.height = 0.28
+	cm1.material = mat
+	upper.mesh = cm1
+	upper.position = Vector3(0, -0.1, 0.1)
+	upper.rotation.x = -0.9
+	_vm.add_child(upper)
+	var fore := MeshInstance3D.new()
+	var cm2 := CylinderMesh.new()
+	cm2.top_radius = 0.07
+	cm2.bottom_radius = 0.06
+	cm2.height = 0.26
+	cm2.material = mat
+	fore.mesh = cm2
+	fore.position = Vector3(0, -0.32, 0.28)
+	fore.rotation.x = -1.3
+	_vm.add_child(fore)
 	var fist := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.15, 0.15, 0.17)
+	var bm := SphereMesh.new()
+	bm.radius = 0.1
+	bm.height = 0.2
 	bm.material = mat
 	fist.mesh = bm
-	fist.position = Vector3(0, -0.4, 0.36)
+	fist.position = Vector3(0, -0.46, 0.42)
 	_vm.add_child(fist)
