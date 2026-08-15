@@ -1,5 +1,5 @@
 extends Node3D
-## 3D-сцена: земля, небо, ресурсы (дерево/камень/сера), игрок-FPS, HUD.
+## 3D-сцена: земля, небо, ресурсы (дерево/камень/сера) с процедурными текстурами, игрок-FPS, HUD.
 
 const Player3DScn := preload("res://scenes/Player3D.tscn")
 const ResNode := preload("res://scripts/resource_node.gd")
@@ -8,9 +8,16 @@ const JoystickScn := preload("res://scripts/joystick.gd")
 var _rng := RandomNumberGenerator.new()
 var _labels := {}
 
+var _mat_ground: StandardMaterial3D
+var _mat_wood: StandardMaterial3D
+var _mat_foliage: StandardMaterial3D
+var _mat_stone: StandardMaterial3D
+var _mat_sulfur: StandardMaterial3D
+
 
 func _ready() -> void:
 	_rng.seed = 99
+	_build_materials()
 	_build_env()
 	_build_ground()
 	_build_resources()
@@ -22,6 +29,45 @@ func _process(_delta: float) -> void:
 	for r in _labels:
 		_labels[r].text = "%s: %d" % [_rname(r), Inv.count(r)]
 
+
+# --- Материалы с процедурными текстурами ---
+
+func _build_materials() -> void:
+	_mat_ground = _mat(_noise_tex(Color(0.27, 0.48, 0.24), 0.14, 1), Vector3(40, 40, 40))
+	_mat_wood = _mat(_noise_tex(Color(0.42, 0.27, 0.15), 0.10, 2), Vector3(2, 3, 2))
+	_mat_foliage = _mat(_noise_tex(Color(0.18, 0.46, 0.18), 0.10, 3), Vector3(2, 2, 2))
+	_mat_stone = _mat(_noise_tex(Color(0.50, 0.50, 0.52), 0.13, 4), Vector3(1, 1, 1))
+	_mat_sulfur = _mat(_noise_tex(Color(0.86, 0.80, 0.26), 0.10, 5), Vector3(1.5, 1.5, 1.5))
+
+
+func _noise_tex(base: Color, amp: float, seed: int, size := 128) -> ImageTexture:
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var n := FastNoiseLite.new()
+	n.seed = seed
+	n.frequency = 0.09
+	n.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n.fractal_octaves = 4
+	for y in range(size):
+		for x in range(size):
+			var v: float = n.get_noise_2d(float(x), float(y))
+			var c := Color(
+				clampf(base.r + v * amp, 0.0, 1.0),
+				clampf(base.g + v * amp, 0.0, 1.0),
+				clampf(base.b + v * amp, 0.0, 1.0))
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+func _mat(tex: ImageTexture, scale: Vector3) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	m.uv1_scale = scale
+	return m
+
+
+# --- Окружение ---
 
 func _build_env() -> void:
 	var env := Environment.new()
@@ -45,9 +91,7 @@ func _build_ground() -> void:
 	var mesh := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(200, 200)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.28, 0.50, 0.25)
-	plane.material = mat
+	plane.material = _mat_ground
 	mesh.mesh = plane
 	g.add_child(mesh)
 	var col := CollisionShape3D.new()
@@ -84,9 +128,7 @@ func _spawn_tree(pos: Vector3) -> void:
 	cm.top_radius = 0.25
 	cm.bottom_radius = 0.35
 	cm.height = 2.2
-	var tm := StandardMaterial3D.new()
-	tm.albedo_color = Color(0.40, 0.26, 0.14)
-	cm.material = tm
+	cm.material = _mat_wood
 	trunk.mesh = cm
 	trunk.position = Vector3(0, 1.1, 0)
 	n.add_child(trunk)
@@ -95,9 +137,7 @@ func _spawn_tree(pos: Vector3) -> void:
 	var sm := SphereMesh.new()
 	sm.radius = 1.2
 	sm.height = 2.4
-	var fm := StandardMaterial3D.new()
-	fm.albedo_color = Color(0.20, 0.50, 0.20)
-	sm.material = fm
+	sm.material = _mat_foliage
 	fol.mesh = sm
 	fol.position = Vector3(0, 2.8, 0)
 	n.add_child(fol)
@@ -122,9 +162,7 @@ func _spawn_rock(pos: Vector3, rtype: String) -> void:
 	var m := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(1.2, 1.0, 1.2)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.50, 0.50, 0.52) if rtype == "stone" else Color(0.85, 0.80, 0.25)
-	bm.material = mat
+	bm.material = _mat_stone if rtype == "stone" else _mat_sulfur
 	m.mesh = bm
 	m.position = Vector3(0, 0.5, 0)
 	n.add_child(m)
