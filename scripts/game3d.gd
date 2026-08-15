@@ -1,17 +1,32 @@
 extends Node3D
-## 3D-сцена: земля/небо, ресурсы с текстурами, животные, игрок-FPS, HUD.
+## 3D-сцена с биомами: земля-текстура биомов (лес/равнина/пустыня/снег/скалы/вода),
+## ресурсы и животные спавнятся по подходящим биомам.
 
 const Player3DScn := preload("res://scenes/Player3D.tscn")
 const ResNode := preload("res://scripts/resource_node.gd")
 const JoystickScn := preload("res://scripts/joystick.gd")
 const AnimalScn := preload("res://scripts/animal3d.gd")
 
+enum Biome { WATER, SAND, PLAINS, FOREST, SNOW, ROCK }
+
+const BCOLOR := {
+	Biome.WATER: Color(0.20, 0.40, 0.70),
+	Biome.SAND: Color(0.84, 0.76, 0.50),
+	Biome.PLAINS: Color(0.32, 0.55, 0.26),
+	Biome.FOREST: Color(0.16, 0.38, 0.16),
+	Biome.SNOW: Color(0.90, 0.92, 0.95),
+	Biome.ROCK: Color(0.50, 0.48, 0.45),
+}
+
 var _rng := RandomNumberGenerator.new()
 var _labels := {}
 var _hp_label: Label
 var _player
 
-var _mat_ground: StandardMaterial3D
+var _elev := FastNoiseLite.new()
+var _moist := FastNoiseLite.new()
+var _temp := FastNoiseLite.new()
+
 var _mat_wood: StandardMaterial3D
 var _mat_foliage: StandardMaterial3D
 var _mat_stone: StandardMaterial3D
@@ -20,6 +35,7 @@ var _mat_sulfur: StandardMaterial3D
 
 func _ready() -> void:
 	_rng.seed = 99
+	_init_biome_noise()
 	_build_materials()
 	_build_env()
 	_build_ground()
@@ -36,10 +52,58 @@ func _process(_delta: float) -> void:
 		_hp_label.text = "HP: %d/%d" % [_player.hp, _player.hp_max]
 
 
+# --- Биомы ---
+
+func _init_biome_noise() -> void:
+	_elev.seed = 101
+	_elev.frequency = 0.012
+	_elev.fractal_octaves = 4
+	_moist.seed = 202
+	_moist.frequency = 0.010
+	_temp.seed = 303
+	_temp.frequency = 0.008
+
+
+func biome_at(x: float, z: float) -> int:
+	var e := _elev.get_noise_2d(x, z)
+	if e < -0.18:
+		return Biome.WATER
+	if e > 0.55:
+		return Biome.ROCK
+	var m := _moist.get_noise_2d(x, z)
+	var t := _temp.get_noise_2d(x, z)
+	if t < -0.30:
+		return Biome.SNOW
+	if m < -0.25:
+		return Biome.SAND
+	if m > 0.28:
+		return Biome.FOREST
+	return Biome.PLAINS
+
+
+func _biome_texture(size := 256) -> ImageTexture:
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var dn := FastNoiseLite.new()
+	dn.seed = 777
+	dn.frequency = 0.6
+	for pz in range(size):
+		for px in range(size):
+			var wx := (float(px) / float(size)) * 200.0 - 100.0
+			var wz := (float(pz) / float(size)) * 200.0 - 100.0
+			var b: int = biome_at(wx, wz)
+			var c: Color = BCOLOR[b]
+			var nv: float = dn.get_noise_2d(wx * 2.0, wz * 2.0) * 0.05
+			c.r = clampf(c.r + nv, 0.0, 1.0)
+			c.g = clampf(c.g + nv, 0.0, 1.0)
+			c.b = clampf(c.b + nv, 0.0, 1.0)
+			img.set_pixel(px, pz, c)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
 # --- Материалы ---
 
 func _build_materials() -> void:
-	_mat_ground = _mat(_noise_tex(Color(0.27, 0.48, 0.24), 0.14, 1), Vector3(40, 40, 40))
 	_mat_wood = _mat(_noise_tex(Color(0.42, 0.27, 0.15), 0.10, 2), Vector3(2, 3, 2))
 	_mat_foliage = _mat(_noise_tex(Color(0.18, 0.46, 0.18), 0.10, 3), Vector3(2, 2, 2))
 	_mat_stone = _mat(_noise_tex(Color(0.50, 0.50, 0.52), 0.13, 4), Vector3(1, 1, 1))
@@ -97,7 +161,10 @@ func _build_ground() -> void:
 	var mesh := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(200, 200)
-	plane.material = _mat_ground
+	var gm := StandardMaterial3D.new()
+	gm.albedo_texture = _biome_texture()
+	gm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	plane.material = gm
 	mesh.mesh = plane
 	g.add_child(mesh)
 	var col := CollisionShape3D.new()
@@ -109,27 +176,36 @@ func _build_ground() -> void:
 	add_child(g)
 
 
+func _rand_pos() -> Vector3:
+	return Vector3(_rng.randf_range(-90, 90), 0, _rng.randf_range(-90, 90))
+
+
+func _pos_in_biomes(allowed: Array) -> Vector3:
+	for _i in range(60):
+		var p := _rand_pos()
+		if biome_at(p.x, p.z) in allowed:
+			return p
+	return _rand_pos()
+
+
 func _build_resources() -> void:
-	for _i in range(35):
-		_spawn_tree(_rand_pos())
-	for _i in range(22):
-		_spawn_rock(_rand_pos(), "stone")
-	for _i in range(14):
-		_spawn_rock(_rand_pos(), "sulfur")
+	for _i in range(55):
+		_spawn_tree(_pos_in_biomes([Biome.FOREST, Biome.PLAINS]))
+	for _i in range(26):
+		_spawn_rock(_pos_in_biomes([Biome.PLAINS, Biome.ROCK, Biome.SAND]), "stone")
+	for _i in range(16):
+		_spawn_rock(_pos_in_biomes([Biome.ROCK, Biome.SAND, Biome.PLAINS]), "sulfur")
 
 
 func _spawn_animals() -> void:
-	var counts := {AnimalScn.Kind.CHICKEN: 6, AnimalScn.Kind.DEER: 5, AnimalScn.Kind.BOAR: 4, AnimalScn.Kind.BEAR: 2}
+	var counts := {AnimalScn.Kind.CHICKEN: 7, AnimalScn.Kind.DEER: 5, AnimalScn.Kind.BOAR: 4, AnimalScn.Kind.BEAR: 2}
 	for k in counts:
 		for _i in range(counts[k]):
 			var a = AnimalScn.new()
 			a.kind = k
-			a.position = Vector3(_rng.randf_range(-85, 85), 1.5, _rng.randf_range(-85, 85))
+			var p := _pos_in_biomes([Biome.PLAINS, Biome.FOREST])
+			a.position = Vector3(p.x, 1.5, p.z)
 			add_child(a)
-
-
-func _rand_pos() -> Vector3:
-	return Vector3(_rng.randf_range(-90, 90), 0, _rng.randf_range(-90, 90))
 
 
 func _spawn_tree(pos: Vector3) -> void:
@@ -194,8 +270,9 @@ func _spawn_rock(pos: Vector3, rtype: String) -> void:
 
 func _build_player() -> void:
 	var p := Player3DScn.instantiate()
-	p.position = Vector3(0, 2, 0)
-	p.spawn_pos = Vector3(0, 2, 0)
+	var sp := _pos_in_biomes([Biome.PLAINS, Biome.FOREST])
+	p.position = Vector3(sp.x, 2, sp.z)
+	p.spawn_pos = p.position
 	add_child(p)
 	_player = p
 
