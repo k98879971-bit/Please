@@ -1,5 +1,5 @@
 extends CharacterBody3D
-## Животное в 3D. Уникальные узнаваемые модели по типу + текстура. Бродят; мирные убегают, хищники нападают.
+## Животное 3D: узнаваемая модель + текстура + АНИМАЦИЯ НОГ при ходьбе. Мирные убегают, хищники нападают.
 
 const GRAV := 22.0
 
@@ -20,6 +20,8 @@ var _dir := Vector3.ZERO
 var _timer := 0.0
 var _atk := 0.0
 var _player
+var _walk_phase := 0.0
+var _legs_arr: Array = []
 
 
 func _ready() -> void:
@@ -62,6 +64,18 @@ func _physics_process(delta: float) -> void:
 	if _dir.length() > 0.1:
 		rotation.y = atan2(_dir.x, _dir.z)
 	move_and_slide()
+	_animate_legs(delta, spd)
+
+
+func _animate_legs(delta: float, base_spd: float) -> void:
+	var hspeed := Vector2(velocity.x, velocity.z).length()
+	var amt: float = clampf(hspeed / maxf(base_spd, 0.1), 0.0, 1.0)
+	_walk_phase += delta * 9.0 * amt
+	for entry in _legs_arr:
+		var pivot: Node3D = entry[0]
+		var off: float = float(entry[1])
+		var target: float = sin(_walk_phase + off) * 0.6 * amt
+		pivot.rotation.x = lerp_angle(pivot.rotation.x, target, 0.4)
 
 
 func _pick_wander() -> void:
@@ -105,6 +119,29 @@ func _build(s: Dictionary) -> void:
 	add_child(col)
 
 
+func _leg_pivot(mat: Material, hip: Vector3, h: float, r: float, off: float) -> void:
+	var pivot := Node3D.new()
+	pivot.position = hip
+	add_child(pivot)
+	var m := MeshInstance3D.new()
+	var c := CylinderMesh.new()
+	c.top_radius = r
+	c.bottom_radius = r
+	c.height = h
+	c.material = mat
+	m.mesh = c
+	m.position = Vector3(0, -h * 0.5, 0)
+	pivot.add_child(m)
+	_legs_arr.append([pivot, off])
+
+
+func _legs(mat: Material, hw: float, hl: float, h: float, r: float) -> void:
+	for sx in [-1.0, 1.0]:
+		for sl in [-1.0, 1.0]:
+			var off := 0.0 if (sx * sl < 0.0) else PI
+			_leg_pivot(mat, Vector3(sx * hw, h, sl * hl), h, r, off)
+
+
 func _build_chicken(sz: float) -> void:
 	var yellow := _flat(Color(1.0, 0.8, 0.2))
 	var red := _flat(Color(0.9, 0.2, 0.2))
@@ -113,8 +150,8 @@ func _build_chicken(sz: float) -> void:
 	_box(Vector3(sz * 0.45, sz * 0.45, sz * 0.45), body_mat, Vector3(0, lh + sz * 1.0, sz * 0.45))
 	_box(Vector3(sz * 0.16, sz * 0.22, sz * 0.3), red, Vector3(0, lh + sz * 1.28, sz * 0.42))
 	_box(Vector3(sz * 0.12, sz * 0.1, sz * 0.25), yellow, Vector3(0, lh + sz * 0.95, sz * 0.72))
-	_cyl(sz * 0.05, lh, yellow, Vector3(-sz * 0.2, lh * 0.5, -sz * 0.2))
-	_cyl(sz * 0.05, lh, yellow, Vector3(sz * 0.2, lh * 0.5, -sz * 0.2))
+	_leg_pivot(yellow, Vector3(-sz * 0.2, lh, -sz * 0.2), lh, sz * 0.05, 0.0)
+	_leg_pivot(yellow, Vector3(sz * 0.2, lh, -sz * 0.2), lh, sz * 0.05, PI)
 
 
 func _build_deer(sz: float) -> void:
@@ -149,12 +186,6 @@ func _build_bear(sz: float) -> void:
 	_box(Vector3(sz * 0.18, sz * 0.18, sz * 0.1), dark, Vector3(-sz * 0.2, lh + sz * 1.18, sz * 0.7))
 	_box(Vector3(sz * 0.18, sz * 0.18, sz * 0.1), dark, Vector3(sz * 0.2, lh + sz * 1.18, sz * 0.7))
 	_box(Vector3(sz * 0.26, sz * 0.2, sz * 0.22), dark, Vector3(0, lh + sz * 0.78, sz * 1.05))
-
-
-func _legs(mat: Material, hw: float, hl: float, h: float, r: float) -> void:
-	for sx in [-1.0, 1.0]:
-		for sl in [-1.0, 1.0]:
-			_cyl(r, h, mat, Vector3(sx * hw, h * 0.5, sl * hl))
 
 
 func _box(s: Vector3, mat: Material, pos: Vector3) -> void:
