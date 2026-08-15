@@ -10,10 +10,10 @@ const AnimalScn := preload("res://scripts/animal3d.gd")
 enum Biome { WATER, SAND, PLAINS, FOREST, SNOW, ROCK }
 
 const BCOLOR := {
-	Biome.WATER: Color(0.20, 0.40, 0.70),
+	Biome.WATER: Color(0.18, 0.38, 0.62),
 	Biome.SAND: Color(0.84, 0.76, 0.50),
-	Biome.PLAINS: Color(0.32, 0.55, 0.26),
-	Biome.FOREST: Color(0.16, 0.38, 0.16),
+	Biome.PLAINS: Color(0.34, 0.56, 0.26),
+	Biome.FOREST: Color(0.15, 0.36, 0.15),
 	Biome.SNOW: Color(0.90, 0.92, 0.95),
 	Biome.ROCK: Color(0.50, 0.48, 0.45),
 }
@@ -56,32 +56,36 @@ func _process(_delta: float) -> void:
 
 func _init_biome_noise() -> void:
 	_elev.seed = 101
-	_elev.frequency = 0.012
-	_elev.fractal_octaves = 4
+	_elev.frequency = 0.010
+	_elev.fractal_octaves = 3
 	_moist.seed = 202
-	_moist.frequency = 0.010
+	_moist.frequency = 0.008
+	_moist.fractal_octaves = 3
 	_temp.seed = 303
-	_temp.frequency = 0.008
+	_temp.frequency = 0.007
+	_temp.fractal_octaves = 3
 
 
 func biome_at(x: float, z: float) -> int:
 	var e := _elev.get_noise_2d(x, z)
-	if e < -0.18:
+	if e < -0.38:
 		return Biome.WATER
-	if e > 0.55:
+	if e < -0.33:
+		return Biome.SAND
+	if e > 0.58:
 		return Biome.ROCK
 	var m := _moist.get_noise_2d(x, z)
 	var t := _temp.get_noise_2d(x, z)
-	if t < -0.30:
+	if t < -0.35:
 		return Biome.SNOW
-	if m < -0.25:
+	if m < -0.28:
 		return Biome.SAND
-	if m > 0.28:
+	if m > 0.25:
 		return Biome.FOREST
 	return Biome.PLAINS
 
 
-func _biome_texture(size := 256) -> ImageTexture:
+func _biome_texture(size := 320) -> ImageTexture:
 	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	var dn := FastNoiseLite.new()
 	dn.seed = 777
@@ -92,7 +96,7 @@ func _biome_texture(size := 256) -> ImageTexture:
 			var wz := (float(pz) / float(size)) * 200.0 - 100.0
 			var b: int = biome_at(wx, wz)
 			var c: Color = BCOLOR[b]
-			var nv: float = dn.get_noise_2d(wx * 2.0, wz * 2.0) * 0.05
+			var nv: float = dn.get_noise_2d(wx * 2.0, wz * 2.0) * 0.035
 			c.r = clampf(c.r + nv, 0.0, 1.0)
 			c.g = clampf(c.g + nv, 0.0, 1.0)
 			c.b = clampf(c.b + nv, 0.0, 1.0)
