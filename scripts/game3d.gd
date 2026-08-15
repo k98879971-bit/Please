@@ -1,5 +1,5 @@
 extends Node3D
-## 3D-сцена с биомами: земля-текстура биомов, ресурсы, животные (с текстурами), игрок-FPS, HUD.
+## 3D-сцена с биомами: земля-текстура биомов, ресурсы, животные (с узорными текстурами), игрок-FPS, HUD.
 
 const Player3DScn := preload("res://scenes/Player3D.tscn")
 const ResNode := preload("res://scripts/resource_node.gd")
@@ -115,10 +115,10 @@ func _build_materials() -> void:
 	_mat_foliage = _mat(_noise_tex(Color(0.18, 0.46, 0.18), 0.10, 3), Vector3(2, 2, 2))
 	_mat_stone = _mat(_noise_tex(Color(0.50, 0.50, 0.52), 0.13, 4), Vector3(1, 1, 1))
 	_mat_sulfur = _mat(_noise_tex(Color(0.86, 0.80, 0.26), 0.10, 5), Vector3(1.5, 1.5, 1.5))
-	_mat_chicken = _mat(_noise_tex(Color(0.96, 0.96, 0.92), 0.05, 11, 64), Vector3(1, 1, 1))
-	_mat_deer = _mat(_noise_tex(Color(0.55, 0.40, 0.27), 0.08, 12, 64), Vector3(1, 1, 1))
-	_mat_boar = _mat(_noise_tex(Color(0.32, 0.26, 0.21), 0.07, 13, 64), Vector3(1, 1, 1))
-	_mat_bear = _mat(_noise_tex(Color(0.30, 0.22, 0.16), 0.07, 14, 64), Vector3(1, 1, 1))
+	_mat_chicken = _mat(_animal_tex(Color(0.96, 0.96, 0.92), Color(0.80, 0.60, 0.40), "speckle", 11), Vector3(1, 1, 1))
+	_mat_deer = _mat(_animal_tex(Color(0.55, 0.40, 0.27), Color(0.95, 0.93, 0.85), "spots", 12), Vector3(1, 1, 1))
+	_mat_boar = _mat(_animal_tex(Color(0.32, 0.26, 0.21), Color(0.55, 0.46, 0.38), "streaks", 13), Vector3(1, 1, 1))
+	_mat_bear = _mat(_animal_tex(Color(0.30, 0.22, 0.16), Color(0.50, 0.38, 0.30), "patches", 14), Vector3(1, 1, 1))
 
 
 func _noise_tex(base: Color, amp: float, seed: int, size := 128) -> ImageTexture:
@@ -135,6 +135,33 @@ func _noise_tex(base: Color, amp: float, seed: int, size := 128) -> ImageTexture
 				clampf(base.r + v * amp, 0.0, 1.0),
 				clampf(base.g + v * amp, 0.0, 1.0),
 				clampf(base.b + v * amp, 0.0, 1.0))
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+# Текстура животного с узором: speckle (крап), spots (пятна), streaks (полосы-щетина), patches (подпалины).
+func _animal_tex(base: Color, accent: Color, mode: String, seed: int, size := 64) -> ImageTexture:
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var p := FastNoiseLite.new()
+	p.seed = seed + 50
+	p.frequency = 0.5
+	p.fractal_octaves = 3
+	for y in range(size):
+		for x in range(size):
+			var c := base
+			if mode == "speckle":
+				if p.get_noise_2d(float(x) * 5.0, float(y) * 5.0) > 0.5:
+					c = base.lerp(accent, 0.6)
+			elif mode == "spots":
+				if p.get_noise_2d(float(x) * 2.5, float(y) * 2.5) > 0.55:
+					c = accent
+			elif mode == "streaks":
+				if p.get_noise_2d(float(x) * 4.0, float(y) * 0.3) > 0.15:
+					c = base.lerp(accent, 0.55)
+			elif mode == "patches":
+				if p.get_noise_2d(float(x) * 1.2, float(y) * 1.2) > 0.2:
+					c = base.lerp(accent, 0.5)
 			img.set_pixel(x, y, c)
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
