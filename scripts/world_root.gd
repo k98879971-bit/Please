@@ -1,12 +1,14 @@
 extends Node2D
-## Корневая сцена: мир + сущности + UI. Спавнит деревья, животных, рыбу, строит интерфейс.
+## Корневая сцена: мир + сущности + UI.
 
 const TREE_FOREST_CHANCE := 0.15
 const TREE_GRASS_CHANCE := 0.025
+const ORE_CHANCE := 0.25
 
 const TreeScn := preload("res://scripts/tree.gd")
 const AnimalScn := preload("res://scripts/animal.gd")
 const FishScn := preload("res://scripts/fish.gd")
+const OreScn := preload("res://scripts/ore.gd")
 const MinimapScn := preload("res://scripts/minimap.gd")
 const HPBarScn := preload("res://scripts/hpbar.gd")
 const StaminaBarScn := preload("res://scripts/staminabar.gd")
@@ -16,11 +18,9 @@ const MenuPanelScn := preload("res://scripts/menupanel.gd")
 
 const WNAMES := {
 	"fist": "Кулаки",
-	"axe": "Топор",
-	"sword": "Меч",
-	"bow": "Лук",
-	"crossbow": "Арбалет",
-	"rod": "Удочка",
+	"axe": "Топор", "sword": "Меч", "bow": "Лук", "crossbow": "Арбалет", "rod": "Удочка", "pickaxe": "Кирка",
+	"stone_axe": "Кам. топор", "stone_sword": "Кам. меч", "stone_bow": "Кам. лук",
+	"stone_crossbow": "Кам. арбалет", "stone_rod": "Кам. удочка", "stone_pickaxe": "Кам. кирка",
 }
 
 @onready var _terrain = $Terrain
@@ -36,6 +36,7 @@ func _ready() -> void:
 	_rng.seed = 24601
 	_player.global_position = _terrain.find_spawn()
 	_spawn_trees()
+	_spawn_ore()
 	_spawn_animals()
 	_spawn_fish()
 	_build_ui()
@@ -61,6 +62,16 @@ func _spawn_trees() -> void:
 				tree.scale_rand = _rng.randf_range(0.8, 1.25)
 				tree.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(0, 10))
 				_entities.add_child(tree)
+
+
+func _spawn_ore() -> void:
+	for x in range(_terrain.WORLD_W):
+		for y in range(_terrain.WORLD_H):
+			var cell := Vector2i(x, y)
+			if _terrain.tile_at(_terrain.map_to_local(cell)) == _terrain.T.ROCK and _rng.randf() < ORE_CHANCE:
+				var o = OreScn.new()
+				o.position = _terrain.map_to_local(cell) + Vector2(_rng.randf_range(-8, 8), _rng.randf_range(-4, 8))
+				_entities.add_child(o)
 
 
 func _spawn_animals() -> void:
@@ -95,7 +106,6 @@ func _build_ui() -> void:
 	root.add_child(JoystickScn.new())
 	root.add_child(HotbarScn.new())
 
-	# Подпись текущего оружия (под полосами)
 	_equip_label = Label.new()
 	_equip_label.offset_left = 12.0
 	_equip_label.offset_top = 250.0
@@ -103,7 +113,6 @@ func _build_ui() -> void:
 	_equip_label.offset_bottom = 274.0
 	root.add_child(_equip_label)
 
-	# Кнопки действий (вертикальный столбик, нижний правый угол)
 	var run_btn := Button.new()
 	run_btn.text = "БЕГ"
 	_stack(run_btn, 0)
@@ -123,7 +132,6 @@ func _build_ui() -> void:
 	fish_btn.button_down.connect(func() -> void: Controls.fish_queued = true)
 	root.add_child(fish_btn)
 
-	# Меню крафта + кнопка
 	_menu_panel = MenuPanelScn.new()
 	root.add_child(_menu_panel)
 	var menu_btn := Button.new()

@@ -1,72 +1,82 @@
 extends Control
-## Инвентарь-хотбар: ряд ячеек по центру внизу экрана. Тап по инструменту — экипировка.
+## Инвентарь-хотбар по центру внизу: ресурсы + имеющиеся инструменты (с прочностью).
+## Тап по инструменту — экипировать. Цвет инструмента краснеет по мере износа.
 
-const SLOTS := [
-	{"id": "wood", "tool": false, "color": Color(0.50, 0.34, 0.18)},
-	{"id": "meat", "tool": false, "color": Color(0.85, 0.25, 0.25)},
-	{"id": "fish", "tool": false, "color": Color(0.30, 0.60, 0.90)},
-	{"id": "axe", "tool": true, "color": Color(0.50, 0.50, 0.52)},
-	{"id": "sword", "tool": true, "color": Color(0.82, 0.82, 0.88)},
-	{"id": "bow", "tool": true, "color": Color(0.32, 0.60, 0.32)},
-	{"id": "crossbow", "tool": true, "color": Color(0.30, 0.30, 0.35)},
-	{"id": "rod", "tool": true, "color": Color(0.72, 0.60, 0.40)},
-]
+const RES := ["wood", "meat", "fish", "stone"]
+const TOOL_ORDER := ["axe", "sword", "bow", "crossbow", "rod", "pickaxe", "stone_axe", "stone_sword", "stone_bow", "stone_crossbow", "stone_rod", "stone_pickaxe"]
+
+const COLORS := {
+	"wood": Color(0.50, 0.34, 0.18), "meat": Color(0.85, 0.25, 0.25),
+	"fish": Color(0.30, 0.60, 0.90), "stone": Color(0.55, 0.55, 0.58),
+	"axe": Color(0.50, 0.50, 0.52), "sword": Color(0.82, 0.82, 0.88),
+	"bow": Color(0.32, 0.60, 0.32), "crossbow": Color(0.30, 0.30, 0.35),
+	"rod": Color(0.72, 0.60, 0.40), "pickaxe": Color(0.55, 0.45, 0.35),
+	"stone_axe": Color(0.45, 0.45, 0.48), "stone_sword": Color(0.60, 0.60, 0.65),
+	"stone_bow": Color(0.40, 0.50, 0.40), "stone_crossbow": Color(0.35, 0.35, 0.40),
+	"stone_rod": Color(0.60, 0.55, 0.45), "stone_pickaxe": Color(0.50, 0.45, 0.40),
+}
 
 var _player
-var _buttons: Array = []
+var _hbox: HBoxContainer
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sz := 60.0
-	var gap := 6.0
-	var n := SLOTS.size()
-	var total := n * sz + (n - 1) * gap
-	anchor_left = 0.5
-	anchor_right = 0.5
+	anchor_left = 0.0
+	anchor_right = 1.0
 	anchor_top = 1.0
 	anchor_bottom = 1.0
-	offset_left = -total * 0.5
-	offset_right = total * 0.5
+	offset_left = 0.0
+	offset_right = 0.0
 	offset_bottom = -14.0
-	offset_top = -14.0 - sz
+	offset_top = -14.0 - 60.0
 	_player = get_tree().get_first_node_in_group("player")
-
-	var hbox := HBoxContainer.new()
-	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hbox.add_theme_constant_override("separation", int(gap))
-	add_child(hbox)
-	for s in SLOTS:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(sz, sz)
-		b.text = "0"
-		b.pressed.connect(_on_slot.bind(s.id, s.tool))
-		_buttons.append(b)
-		hbox.add_child(b)
-	Inv.changed.connect(_refresh)
-	_refresh()
+	_hbox = HBoxContainer.new()
+	_hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hbox.add_theme_constant_override("separation", 6)
+	add_child(_hbox)
+	Inv.changed.connect(_rebuild)
+	_rebuild()
 
 
-func _on_slot(id: String, is_tool: bool) -> void:
-	if is_tool and _player and Inv.count(id) > 0:
+func _rebuild() -> void:
+	for c in _hbox.get_children():
+		_hbox.remove_child(c)
+		c.free()
+	for id in RES:
+		_add(id, false)
+	for id in TOOL_ORDER:
+		if Inv.count(id) > 0:
+			_add(id, true)
+
+
+func _add(id: String, is_tool: bool) -> void:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(54, 54)
+	var num: int = Inv.durability_of(id) if is_tool else Inv.count(id)
+	b.text = str(num)
+	if is_tool:
+		b.pressed.connect(_equip.bind(id))
+	var base: Color = COLORS.get(id, Color.GRAY)
+	var equipped: bool = (_player != null) and _player.equipped == id
+	_style(b, base, equipped, is_tool, id)
+	_hbox.add_child(b)
+
+
+func _equip(id: String) -> void:
+	if _player and Inv.count(id) > 0:
 		_player.equipped = id
-		_refresh()
+		_rebuild()
 
 
-func _refresh() -> void:
-	for i in range(SLOTS.size()):
-		var s: Dictionary = SLOTS[i]
-		var c := Inv.count(s.id)
-		var equipped: bool = (_player != null) and _player.equipped == s.id
-		var owned: bool = (not s.tool) or c > 0
-		_buttons[i].text = str(c)
-		_buttons[i].disabled = bool(s.tool) and c <= 0
-		_apply_style(_buttons[i], s.color, equipped, owned)
-
-
-func _apply_style(b: Button, color: Color, equipped: bool, owned: bool) -> void:
+func _style(b: Button, base: Color, equipped: bool, is_tool: bool, id: String) -> void:
+	var col := base
+	if is_tool:
+		var ratio := clampf(float(Inv.durability_of(id)) / float(max(1, Inv.max_dur(id))), 0.0, 1.0)
+		col = base.lerp(Color(0.9, 0.2, 0.2), 1.0 - ratio)
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = color if owned else color.darkened(0.6)
+	sb.bg_color = col
 	sb.corner_radius_top_left = 8
 	sb.corner_radius_top_right = 8
 	sb.corner_radius_bottom_right = 8
@@ -87,6 +97,4 @@ func _apply_style(b: Button, color: Color, equipped: bool, owned: bool) -> void:
 	b.add_theme_stylebox_override("hover", sb)
 	b.add_theme_stylebox_override("pressed", sb)
 	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_color_override("font_hover_color", Color.WHITE)
-	b.add_theme_color_override("font_pressed_color", Color.WHITE)
-	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_font_size_override("font_size", 18)

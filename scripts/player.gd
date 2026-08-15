@@ -1,5 +1,5 @@
 extends CharacterBody2D
-## Игрок. HP=100, выносливость=50. Оружие с уроном. Рыбалка удочкой у воды.
+## Игрок. HP=100, выносливость=50. Инструменты с уроном и прочностью (изнашиваются).
 
 @export var speed: float = 260.0
 @export var sprint_mult: float = 1.6
@@ -8,13 +8,21 @@ const MAX_HP := 100
 const STAMINA_MAX := 50.0
 const ProjectileScn := preload("res://scripts/projectile.gd")
 
-# Урон: меч 50, арбалет 55, лук 30, топор 25, кулаки 5. can_chop — может рубить деревья.
-const WEAPONS := {
-	"fist": {"damage": 5, "range": 80.0, "ranged": false, "can_chop": true},
-	"axe": {"damage": 25, "range": 95.0, "ranged": false, "can_chop": true},
-	"sword": {"damage": 50, "range": 110.0, "ranged": false, "can_chop": false},
-	"bow": {"damage": 30, "range": 0.0, "ranged": true, "can_chop": false},
-	"crossbow": {"damage": 55, "range": 0.0, "ranged": true, "can_chop": false},
+# Инструменты: урон/дальность/стрелковое/может рубить/может добывать руду/удочка.
+const TOOLS := {
+	"fist": {"damage": 5, "range": 80.0, "ranged": false, "can_chop": true, "can_mine": false, "rod": false},
+	"axe": {"damage": 25, "range": 95.0, "ranged": false, "can_chop": true, "can_mine": false, "rod": false},
+	"sword": {"damage": 50, "range": 110.0, "ranged": false, "can_chop": false, "can_mine": false, "rod": false},
+	"bow": {"damage": 30, "range": 0.0, "ranged": true, "can_chop": false, "can_mine": false, "rod": false},
+	"crossbow": {"damage": 55, "range": 0.0, "ranged": true, "can_chop": false, "can_mine": false, "rod": false},
+	"rod": {"damage": 5, "range": 0.0, "ranged": false, "can_chop": false, "can_mine": false, "rod": true},
+	"pickaxe": {"damage": 10, "range": 90.0, "ranged": false, "can_chop": false, "can_mine": true, "rod": false},
+	"stone_axe": {"damage": 40, "range": 100.0, "ranged": false, "can_chop": true, "can_mine": false, "rod": false},
+	"stone_sword": {"damage": 75, "range": 115.0, "ranged": false, "can_chop": false, "can_mine": false, "rod": false},
+	"stone_bow": {"damage": 50, "range": 0.0, "ranged": true, "can_chop": false, "can_mine": false, "rod": false},
+	"stone_crossbow": {"damage": 85, "range": 0.0, "ranged": true, "can_chop": false, "can_mine": false, "rod": false},
+	"stone_rod": {"damage": 5, "range": 0.0, "ranged": false, "can_chop": false, "can_mine": false, "rod": true},
+	"stone_pickaxe": {"damage": 20, "range": 95.0, "ranged": false, "can_chop": false, "can_mine": true, "rod": false},
 }
 
 var hp := MAX_HP
@@ -64,15 +72,16 @@ func take_damage(amount: int) -> void:
 
 
 func _attack() -> void:
-	var w: Dictionary = WEAPONS.get(equipped, WEAPONS["fist"])
+	var w: Dictionary = TOOLS.get(equipped, TOOLS["fist"])
 	if w.ranged:
 		_spawn_projectile(int(w.damage))
 	else:
 		_spawn_swing()
-		_melee(int(w.damage), float(w.range), bool(w.can_chop))
+		_melee(int(w.damage), float(w.range), bool(w.can_chop), bool(w.can_mine))
+	_wear_tool()
 
 
-func _melee(damage: int, rng: float, can_chop: bool) -> void:
+func _melee(damage: int, rng: float, can_chop: bool, can_mine: bool) -> void:
 	for a in get_tree().get_nodes_in_group("animals"):
 		if is_instance_valid(a) and global_position.distance_to(a.global_position) < rng:
 			a.take_hit(damage, global_position)
@@ -80,10 +89,17 @@ func _melee(damage: int, rng: float, can_chop: bool) -> void:
 		for t in get_tree().get_nodes_in_group("trees"):
 			if is_instance_valid(t) and global_position.distance_to(t.global_position) < rng:
 				t.take_hit(damage)
+	if can_mine:
+		for o in get_tree().get_nodes_in_group("ore"):
+			if is_instance_valid(o) and global_position.distance_to(o.global_position) < rng:
+				o.take_hit(damage)
 
 
 func _try_fish() -> void:
-	if _fish_cd > 0.0 or not Inv.has("rod"):
+	if _fish_cd > 0.0:
+		return
+	var w: Dictionary = TOOLS.get(equipped, {})
+	if not w.get("rod", false):
 		return
 	var world = get_tree().get_first_node_in_group("world")
 	if not world:
@@ -102,6 +118,15 @@ func _try_fish() -> void:
 		return
 	Inv.add("fish")
 	_fish_cd = 1.2
+	_wear_tool()
+
+
+func _wear_tool() -> void:
+	if equipped == "fist":
+		return
+	Inv.use_tool(equipped)
+	if Inv.count(equipped) <= 0:
+		equipped = "fist"
 
 
 func _spawn_projectile(damage: int) -> void:

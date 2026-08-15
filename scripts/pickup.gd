@@ -22,6 +22,8 @@ func _build_visual() -> void:
 			_circle(Color(0.85, 0.25, 0.25), 7.0)
 		"wood":
 			_circle(Color(0.5, 0.34, 0.18), 6.0)
+		"stone":
+			_circle(Color(0.55, 0.55, 0.58), 6.0)
 		_:
 			_circle(Color(0.9, 0.9, 0.2), 6.0)
 
